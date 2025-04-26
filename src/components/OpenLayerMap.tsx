@@ -16,6 +16,7 @@ import GeoJSON from "ol/format/GeoJSON"
 import {Style, Icon, Fill, Circle, Stroke} from "ol/style"
 
 const OpenLayersMap = () => {
+	const [data,setData] = useState({});
     const mapDivRef = useRef<HTMLDivElement>(null);
     const popupRef = useRef<HTMLDivElement>(null);
 
@@ -40,6 +41,14 @@ style: new Style({
     }),
 
 });
+const vectorsource_offset: any = new VectorSource();
+const format: any = new GeoJSON();
+ //vectorsource_offset.addFeature(format.readFeatures(data))
+
+const vectorLayer2: any = new VectorLayer({
+    source: vectorsource_offset,
+
+});
 const vectorLayer1: any = new VectorLayer({
     source: new VectorSource({
         format: new GeoJSON(),
@@ -48,11 +57,30 @@ attributions: ['Los Angeles GeoHub |']
     }),
 
 });
+const urls: string[] = [];
+for(var i = 0; i < 1088001; i = i + 2000){
+  const url_2: any = `https://geo.sandag.org/server/rest/services/Hosted/Parcels/FeatureServer/0/query?where=1%3D1&outFields=*&returnGeometry=true&resultOffset=${i}&resultType=none&f=geojson`;
+	  urls.push(url_2);
+}
 
 
   // default view
 
     useEffect(() => {
+
+
+	    urls.forEach((url,index) => {
+
+  fetch(url)
+  .then(response => response.json())
+  .then(response => vectorsource_offset.addFeatures(format.readFeatures(response, {
+          dataProjection: 'EPSG:4326',
+          featureProjection: map.getView().getProjection(),
+        })))
+  .catch(error => console.error(error));
+
+	    })
+	    
 
 const overlay = new Overlay({
       element: popupRef.current as HTMLDivElement,
@@ -68,8 +96,7 @@ const overlay = new Overlay({
                 new TileLayer({
                     source: new OSM(),
                 }),
-		vectorLayer,
-		vectorLayer1
+		vectorLayer2,
             ],
 view: new View({
     center: [-13042228, 3857849],
@@ -134,7 +161,7 @@ const feature = map.forEachFeatureAtPixel(e.pixel, function (feature) {
     //def_view.fit(geoJSONFeatures[0].getGeometry().getExtent(), { padding: [100, 100, 100, 100]});
 
         return () => map.setTarget(undefined);
-    }, []);
+    }, [data]);
 
     return (
         <>

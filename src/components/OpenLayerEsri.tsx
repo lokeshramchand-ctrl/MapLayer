@@ -122,6 +122,7 @@ const map = new Map({
   }),
 });
 
+
     return (
         <>
             <div ref={mapDivRef} className='map' />
