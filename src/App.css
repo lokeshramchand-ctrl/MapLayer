@@ -29,3 +29,14 @@
   width: 220px;
   color: black;
 };
+
+.input {
+  margin-bottom: 30px;
+  padding: 5px 15px;
+  width: 300px;
+}
+
+.btn {
+  padding: 5px 10px;
+  cursor: pointer;
+}

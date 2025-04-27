@@ -7,7 +7,9 @@ import Overlay from 'ol/Overlay'
 //import Popup from 'ol/Popup'
 //import {tile as tileStrategy} from 'ol/loadingstrategy';
 //import {createXYZ} from 'ol/tilegrid';
+import {Search} from 'ol-ext/control/SearchFeature';
 import { OSM } from 'ol/source';
+import {Select} from 'ol/interaction/Select';
 import { Coordinate } from 'ol/coordinate';
 import VectorLayer from "ol/layer/Vector"
 import VectorSource from "ol/source/Vector"
@@ -16,6 +18,15 @@ import GeoJSON from "ol/format/GeoJSON"
 import {Style, Icon, Fill, Circle, Stroke} from "ol/style"
 
 const OpenLayersMap = () => {
+  const [term, setTerm] = useState('');
+
+  const submitForm = (event: React.FormEvent<HTMLFormElement>) => {
+    // Preventing the page from reloading
+    event.preventDefault();
+
+    // Do something 
+    alert(term);
+  }
 	const [data,setData] = useState({});
     const mapDivRef = useRef<HTMLDivElement>(null);
     const popupRef = useRef<HTMLDivElement>(null);
@@ -104,6 +115,15 @@ view: new View({
   }),
   overlays: [overlay],
 	});
+	 // Control Select 
+  var select = new Select({});
+  map.addInteraction(select);
+
+	var search = new Search ({
+		source:vectorsource_offset,
+
+
+	})
 
         map.on('click', (e) => {
             setClickedCoordinate(e.coordinate);
@@ -118,16 +138,19 @@ const feature = map.forEachFeatureAtPixel(e.pixel, function (feature) {
       // Show popup at clicked position
       overlay.setPosition(coordinate);
       if(feature)
-      console.log("feature " + JSON.stringify(feature));
+      console.log("feature " + JSON.stringify(feature,null,'\t'));
 
   if(feature && feature.get("subname")){
       if (popupRef.current) {
-        popupRef.current.innerHTML = `<p>You clicked here:</p><code>` +
-		`<p>Parcel</p>` + 
-
-		`<p>${feature.get('subname')}</p>` + 
+        popupRef.current.innerHTML = `<p>Parcel</p><code>` +
+		`<p>Parcel ID ${feature.get('parcelid')}</p>` + 
+		`<p>APN ${feature.get('apn')}</p>` + 
+		`<p>Legldesc ${feature.get('legldesc')}</p>` + 
+		`<p>x \& y coord${feature.get('x_coord')} / ${feature.get('y_coord')}</p>` + 
+		`<p>${feature.get('situs_address')} ${feature.get('situs_street')}  ${feature.get('situs_suffix')} ${feature.get('situs_community')} ${feature.get('situs_zip')}</p>` + 
 		`<p> Unit Qty ${feature.get('unitqty')}</p>` + 
-		`<p>${feature.get('situs_community')} ${feature.get('situs_zip')}</p>` + 
+		`<p> Usable sq ft. ${feature.get('usable_sq_feet')}</p>` + 
+		`<p> total lvg area ${feature.get('total_lvg_area')}</p>` + 
 		`<p>bedrooms ${feature.get('bedrooms')} Baths ${feature.get('baths')}</p>` + 
 		 `</code>`;
       }
@@ -166,6 +189,18 @@ const feature = map.forEachFeatureAtPixel(e.pixel, function (feature) {
     return (
         <>
             <div ref={mapDivRef} className='map'>
+    <div className="container">
+      <form onSubmit={submitForm}>
+        <input
+          value={term}
+          onChange={(e) => setTerm(e.target.value)}
+          type="text"
+          placeholder="Enter a term"
+          className="input"
+        />
+        <button type="submit" className="btn">Submit</button>
+      </form>
+    </div>
 <div ref={popupRef} className="ol-popup"/>
 	    </div>
             {clickedCoordinate && (
