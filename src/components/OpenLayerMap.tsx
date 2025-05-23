@@ -7,9 +7,10 @@ import Overlay from 'ol/Overlay'
 //import Popup from 'ol/Popup'
 //import {tile as tileStrategy} from 'ol/loadingstrategy';
 //import {createXYZ} from 'ol/tilegrid';
-import {Search} from 'ol-ext/control/SearchFeature';
+//import {Search} from 'ol-ext/control/SearchFeature';
 import { OSM } from 'ol/source';
-import {Select} from 'ol/interaction/Select';
+import  {fromLonLat}  from 'ol/proj';
+//import {Select} from 'ol/interaction/Select';
 import { Coordinate } from 'ol/coordinate';
 import VectorLayer from "ol/layer/Vector"
 import VectorSource from "ol/source/Vector"
@@ -18,11 +19,24 @@ import GeoJSON from "ol/format/GeoJSON"
 import {Style, Icon, Fill, Circle, Stroke} from "ol/style"
 
 const OpenLayersMap = () => {
-  const [term, setTerm] = useState('');
+  const [term, setTerm] = useState({});
+  const [address, setAddress] = useState();
 
-  const submitForm = (event: React.FormEvent<HTMLFormElement>) => {
+  const submitForm = async (event: React.FormEvent<HTMLFormElement>) => {
     // Preventing the page from reloading
     event.preventDefault();
+
+  //fetch(`https://nominatim.openstreetmap.org/search?q=${term}&format=json&polygon=1&addressdetails=1`)
+ // .then(response => response.json())
+  //.then(response => console.log(response))
+ // .then(({data: address}) => {setAddress(address)})
+  //console.log(address)
+    const response = await fetch(`https://nominatim.openstreetmap.org/search?q=${term}&format=json&polygon=1&addressdetails=1`)
+
+    const json = await response.json();
+    console.log(json);
+    setAddress(json);
+    console.log(address);
 
     // Do something 
     alert(term);
@@ -35,6 +49,9 @@ const OpenLayersMap = () => {
 
   const url_1: any = "https://geo.sandag.org/server/rest/services/Hosted/Address_Points/FeatureServer/0/query?where=1%3D1&outFields=*&returnGeometry=true&resultType=standard&f=geojson";
   const url_2: any = "https://geo.sandag.org/server/rest/services/Hosted/Parcels/FeatureServer/0/query?where=1%3D1&outFields=*&returnGeometry=true&resultType=none&f=geojson";
+  const url_3: any = "https://geo.sandag.org/server/rest/services/Hosted/Zoning_Base_SD/FeatureServer/0/query?where=1%3D1&outFields=*&returnGeometry=true&resultType=standard&f=geojson";
+  const url_4: any = "https://geo.sandag.org/server/rest/services/Hosted/Water_Main_SD/FeatureServer/0/query?where=1%3D1&outFields=*&returnGeometry=true&resultType=standard&f=geojson";
+
 
 const vectorLayer: any = new VectorLayer({
     source: new VectorSource({
@@ -53,6 +70,7 @@ style: new Style({
 
 });
 const vectorsource_offset: any = new VectorSource();
+const vectorsource_offset_1: any = new VectorSource();
 const format: any = new GeoJSON();
  //vectorsource_offset.addFeature(format.readFeatures(data))
 
@@ -68,30 +86,41 @@ attributions: ['Los Angeles GeoHub |']
     }),
 
 });
-const urls: string[] = [];
-for(var i = 0; i < 1088001; i = i + 2000){
-  const url_2: any = `https://geo.sandag.org/server/rest/services/Hosted/Parcels/FeatureServer/0/query?where=1%3D1&outFields=*&returnGeometry=true&resultOffset=${i}&resultType=none&f=geojson`;
-	  urls.push(url_2);
-}
 
+const vectorLayer_given: any = new VectorLayer();
+const vectorLayer_parcel: any = new VectorLayer();
 
   // default view
 
-    useEffect(() => {
+  const vecLayerCreation = async (url,length,map,vectorLayer) => {
 
-
-	    urls.forEach((url,index) => {
-
-  fetch(url)
+const vectorsource_layer: any = new VectorSource();
+const format: any = new GeoJSON();
+const urls: string[] = [];
+for(var i = 0; i < length; i = i + 2000){
+	  urls.push(url + `&resultOffset=${i}`);
+}
+console.log(urls)
+	    urls.forEach((url_each,index) => {
+  fetch(url_each)
   .then(response => response.json())
-  .then(response => vectorsource_offset.addFeatures(format.readFeatures(response, {
+  .then(response => vectorsource_layer.addFeatures(format.readFeatures(response, {
           dataProjection: 'EPSG:4326',
           featureProjection: map.getView().getProjection(),
         })))
   .catch(error => console.error(error));
 
 	    })
-	    
+ //vectorsource_offset.addFeature(format.readFeatures(data))
+vectorLayer.setSource(vectorsource_layer)
+console.log(vectorLayer)
+
+
+  }
+    useEffect(() => {
+
+var ar = [-117.9112790,34.0296349]
+    var proj_lat_long = fromLonLat(ar);
 
 const overlay = new Overlay({
       element: popupRef.current as HTMLDivElement,
@@ -107,23 +136,23 @@ const overlay = new Overlay({
                 new TileLayer({
                     source: new OSM(),
                 }),
-		vectorLayer2,
             ],
 view: new View({
     center: [-13042228, 3857849],
+    //center: proj_lat_long,
     zoom: 12,
   }),
   overlays: [overlay],
 	});
-	 // Control Select 
-  var select = new Select({});
-  map.addInteraction(select);
 
-	var search = new Search ({
-		source:vectorsource_offset,
+//vecLayerCreation(url_4,3718,map,vectorLayer_given)
+//vecLayerCreation(url_2,1088001,map,vectorLayer_parcel)
 
+	//map.addLayer(vectorLayer_given)
+ 
+	//const true_we = map.setLayers([vectorLayer_parcel])
+	//console.log(true_we)
 
-	})
 
         map.on('click', (e) => {
             setClickedCoordinate(e.coordinate);
@@ -167,7 +196,7 @@ const feature = map.forEachFeatureAtPixel(e.pixel, function (feature) {
       }
   }
   else{
-      if (popupRef.current) {
+      if (popupmef.current) {
         popupRef.current.innerHTML = `<p>You clicked here:</p><code>` +
 		`<p>Not a parcel or Address Point</p>` + 
 		 `</code>`;
@@ -180,11 +209,26 @@ const feature = map.forEachFeatureAtPixel(e.pixel, function (feature) {
         });
 
 
+    // Converting lat long to mercator projection
+ 
+    // Zoom to lat lon
+    if(address){
+	    console.log("asdf" + address[0].lat)
+
+var ar = [address[0].lat, address[0].lon]
+    var proj_lat_long = fromLonLat(ar);
+    map.setView(
+        new View({
+        center: proj_lat_long,
+        zoom: 17
+	})
+    )
+    }
  // fit view to geometry of geojson feature with padding
     //def_view.fit(geoJSONFeatures[0].getGeometry().getExtent(), { padding: [100, 100, 100, 100]});
 
         return () => map.setTarget(undefined);
-    }, [data]);
+    }, [address]);
 
     return (
         <>
