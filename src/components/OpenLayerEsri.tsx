@@ -1,17 +1,17 @@
-import {useRef} from 'react';
+import { useRef } from 'react';
 import Map from 'ol/Map';
 import View from 'ol/View';
 import EsriJSON from 'ol/format/EsriJSON';
 import TileLayer from 'ol/layer/Tile';
 import VectorLayer from 'ol/layer/Vector';
-import {tile as tileStrategy} from 'ol/loadingstrategy';
-import {fromLonLat} from 'ol/proj';
+import { tile as tileStrategy } from 'ol/loadingstrategy';
+import { fromLonLat } from 'ol/proj';
 import ImageTile from 'ol/source/ImageTile';
 import VectorSource from 'ol/source/Vector';
 import Fill from 'ol/style/Fill';
 import Stroke from 'ol/style/Stroke';
 import Style from 'ol/style/Style';
-import {createXYZ} from 'ol/tilegrid';
+import { createXYZ } from 'ol/tilegrid';
 
 const serviceUrl =
   'https://services-eu1.arcgis.com/NPIbx47lsIiu2pqz/ArcGIS/rest/services/' +
@@ -44,23 +44,23 @@ const style = new Style({
 
 
 const OpenLayerEsri = () => {
-const mapDivRef = useRef<HTMLDivElement>(null);
-const vectorSource = new VectorSource({
-  format: new EsriJSON(),
-  url: function (extent, projection) {
-    // ArcGIS Server only wants the numeric portion of the projection ID.
-    const srid = projection
-      .getCode()
-      .split(/:(?=\d+$)/)
-      .pop();
+  const mapDivRef = useRef<HTMLDivElement>(null);
+  const vectorSource = new VectorSource({
+    format: new EsriJSON(),
+    url: function (extent, projection) {
+      // ArcGIS Server only wants the numeric portion of the projection ID.
+      const srid = projection
+        .getCode()
+        .split(/:(?=\d+$)/)
+        .pop();
 
-    const url =
-      serviceUrl +
-      layer +
-      '/query/?f=json&' +
-      'returnGeometry=true&spatialRel=esriSpatialRelIntersects&geometry=' +
-      encodeURIComponent(
-        '{"xmin":' +
+      const url =
+        serviceUrl +
+        layer +
+        '/query/?f=json&' +
+        'returnGeometry=true&spatialRel=esriSpatialRelIntersects&geometry=' +
+        encodeURIComponent(
+          '{"xmin":' +
           extent[0] +
           ',"ymin":' +
           extent[1] +
@@ -71,62 +71,62 @@ const vectorSource = new VectorSource({
           ',"spatialReference":{"wkid":' +
           srid +
           '}}',
-      ) +
-      '&geometryType=esriGeometryEnvelope&inSR=' +
-      srid +
-      '&outFields=*' +
-      '&outSR=' +
-      srid;
+        ) +
+        '&geometryType=esriGeometryEnvelope&inSR=' +
+        srid +
+        '&outFields=*' +
+        '&outSR=' +
+        srid;
 
-    return url;
-  },
-  strategy: tileStrategy(
-    createXYZ({
-      tileSize: 512,
-    }),
-  ),
-  attributions:
-    'University of Leicester (commissioned by the ' +
-    '<a href="https://www.arcgis.com/home/item.html?id=' +
-    'd5f05b1dc3dd4d76906c421bc1727805">National Trust</a>)',
-});
-
-const vector = new VectorLayer({
-  source: vectorSource,
-  style: function (feature) {
-    const classify = feature.get('LU_2014');
-    const color = fillColors[classify] || [0, 0, 0, 0];
-    style.getFill().setColor(color);
-    return style;
-  },
-  opacity: 0.7,
-});
-
-const raster = new TileLayer({
-  source: new ImageTile({
+      return url;
+    },
+    strategy: tileStrategy(
+      createXYZ({
+        tileSize: 512,
+      }),
+    ),
     attributions:
-      'Tiles © <a href="https://services.arcgisonline.com/ArcGIS/' +
-      'rest/services/World_Topo_Map/MapServer">ArcGIS</a>',
-    url:
-      'https://server.arcgisonline.com/ArcGIS/rest/services/' +
-      'World_Topo_Map/MapServer/tile/{z}/{y}/{x}',
-  }),
-});
+      'University of Leicester (commissioned by the ' +
+      '<a href="https://www.arcgis.com/home/item.html?id=' +
+      'd5f05b1dc3dd4d76906c421bc1727805">National Trust</a>)',
+  });
 
-const map = new Map({
-  layers: [raster,vector],
-  target: mapDivRef.current as HTMLDivElement,
-  view: new View({
-    center: fromLonLat([1.72, 52.4]),
-    zoom: 14,
-  }),
-});
+  const vector = new VectorLayer({
+    source: vectorSource,
+    style: function (feature) {
+      const classify = feature.get('LU_2014');
+      const color = fillColors[classify] || [0, 0, 0, 0];
+      style.getFill().setColor(color);
+      return style;
+    },
+    opacity: 0.7,
+  });
+
+  const raster = new TileLayer({
+    source: new ImageTile({
+      attributions:
+        'Tiles © <a href="https://services.arcgisonline.com/ArcGIS/' +
+        'rest/services/World_Topo_Map/MapServer">ArcGIS</a>',
+      url:
+        'https://server.arcgisonline.com/ArcGIS/rest/services/' +
+        'World_Topo_Map/MapServer/tile/{z}/{y}/{x}',
+    }),
+  });
+
+  const map = new Map({
+    layers: [raster, vector],
+    target: mapDivRef.current as HTMLDivElement,
+    view: new View({
+      center: fromLonLat([1.72, 52.4]),
+      zoom: 14,
+    }),
+  });
 
 
-    return (
-        <>
-            <div ref={mapDivRef} className='map' />
-        </>
-    );
+  return (
+    <>
+      <div ref={mapDivRef} className='map' />
+    </>
+  );
 }
 export default OpenLayerEsri

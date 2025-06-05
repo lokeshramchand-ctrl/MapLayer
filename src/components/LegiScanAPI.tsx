@@ -1,11 +1,11 @@
-//import { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 
 async function getBills(data) {
 	const bill_ids: number[] = [];
 	const bill_titles: string[] = [];
 	var results: any = data["searchresult"]["results"];
 	for(var i = 0; i < data["searchresult"]["summary"]["count"]; i++){
-		var bill_id: integer = results[i]["bill_id"];
+		var bill_id: number = results[i]["bill_id"];
 		bill_ids.push(bill_id);
 	}
 	for(var i = 0; i < bill_ids.length; i++){

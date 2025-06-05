@@ -14,7 +14,7 @@ const SearchBar = () => {
     console.log("print");
   fetch(`https://nominatim.openstreetmap.org/search?q=${term}&format=json&polygon=1&addressdetails=1`)
   .then(response => response.json())
-  .then(respone => console.log("printed address: " + response))
+  .then(response => console.log("printed address: " + response))
   }
 
     useEffect(() => {
@@ -34,7 +34,7 @@ const SearchBar = () => {
           placeholder="Enter a term"
           className="input"
         />
-        <button type="submit" className="btn">Submi/button>
+        <button type="submit" className="btn">Submit</button>
       </form>
     </div>
   );
