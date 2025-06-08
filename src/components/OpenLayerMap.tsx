@@ -11,6 +11,9 @@ import GeoJSON from 'ol/format/GeoJSON';
 import Style from 'ol/style/Style';
 import Stroke from 'ol/style/Stroke';
 import Fill from 'ol/style/Fill';
+import Icon from 'ol/style/Icon';
+import Point from 'ol/geom/Point';
+import Feature from 'ol/Feature';
 
 const OpenLayersMap = () => {
   // const [term, setTerm] = useState({});
@@ -40,115 +43,107 @@ const OpenLayersMap = () => {
   const mapDivRef = useRef<HTMLDivElement>(null);
   const [clickedCoordinate, setClickedCoordinate] = useState<Coordinate>();
   const mapRef = useRef<Map | null>(null);
+const markerLayerRef = useRef<VectorLayer | null>(null);
 
-  useEffect(() => {
-
-    //Initial Location
-    var ar = [-117.9112790, 34.0296349]
-    var proj_lat_long = fromLonLat(ar);
-
-    //Map Display
+useEffect(() => {
+  if (!mapRef.current) {
     const map = new Map({
       target: mapDivRef.current as HTMLDivElement,
-      layers: [
-        new TileLayer({
-          source: new OSM(),
-        }),
-      ],
-      //End of Map Initialization
-
-
-      view: new View({
-        center: [-13042228, 3857849],
-        //center: proj_lat_long,
-        zoom: 12,
-      }),
+      layers: [new TileLayer({ source: new OSM() })],
     });
-  mapRef.current = map;
-
+    mapRef.current = map;
 
     map.on('click', (e) => {
       setClickedCoordinate(e.coordinate);
-      // Get Coordinates of click
-      const coordinate = e.coordinate;
-      //const hdms = toStringHDMS(toLonLat(coordinate));
-      const feature = map.forEachFeatureAtPixel(e.pixel, function (feature) {
-        return feature;
-      });
+    });
+  }
 
+  if (address && address.length > 0) {
+    const lat = parseFloat(address[0].lat);
+    const lon = parseFloat(address[0].lon);
+    const coords = fromLonLat([lon, lat]);
+
+    // Set view to the searched location
+    mapRef.current!.setView(new View({
+      center: coords,
+      zoom: 15,
+    }));
+
+    // Create the marker feature
+    const markerFeature = new Feature({
+      geometry: new Point(coords),
     });
 
+    markerFeature.setStyle(new Style({
+      image: new Icon({
+        anchor: [0.5, 1],
+        src: 'https://cdn-icons-png.flaticon.com/512/684/684908.png', // A pin icon
+        scale: 0.05,
+      }),
+    }));
 
-    //Needed for Searching Location
-    // Zoom to lat lon
-    if (address) {
-      console.log("ASDF" + address[1].lat)
+    // Create vector source and layer
+    const vectorSource = new VectorSource({
+      features: [markerFeature],
+    });
 
-      var ar = [address[1].lon, address[1].lat]
-      var proj_lat_long = fromLonLat(ar);
-      map.setView(
-        new View({
-          center: proj_lat_long,
-          zoom: 15
-        })
-      )
+    const markerLayer = new VectorLayer({
+      source: vectorSource,
+    });
+
+    // Remove old marker layer if it exists
+    if (markerLayerRef.current) {
+      mapRef.current!.removeLayer(markerLayerRef.current);
     }
 
-    return () => map.setTarget(undefined);
-  }, [address]);
+    // Add new marker layer
+    mapRef.current!.addLayer(markerLayer);
+    markerLayerRef.current = markerLayer;
+  }
+}, [address]);
 
 
+  //Parcel Layer
+  useEffect(() => {
+    if (!mapRef.current) return;
 
-//Parcel Layer
-useEffect(() => {
-  if (!mapRef.current) return;
+    const url = 'https://geo.sandag.org/server/rest/services/Hosted/Parcels/FeatureServer/0/query' +
+      '?where=1=1&outFields=*&returnGeometry=true&f=geojson&resultRecordCount=5000';
 
-const url = 'https://geo.sandag.org/server/rest/services/Hosted/Parcels/FeatureServer/0/query' +
-            '?where=1=1&outFields=*&returnGeometry=true&f=geojson&resultRecordCount=5000';
-
-  fetch(url)
-    .then((res) => res.json())
-    .then((geojsonData) => {
-      const vectorSource = new VectorSource({
-        features: new GeoJSON().readFeatures(geojsonData, {
-          featureProjection: 'EPSG:3857', // Make sure features match OSM projection
-        }),
-      });
-
-      const vectorLayer = new VectorLayer({
-        source: vectorSource,
-        style: new Style({
-          stroke: new Stroke({
-            color: 'green',
-            width: 1.5,
+    fetch(url)
+      .then((res) => res.json())
+      .then((geojsonData) => {
+        const vectorSource = new VectorSource({
+          features: new GeoJSON().readFeatures(geojsonData, {
+            featureProjection: 'EPSG:3857', // Make sure features match OSM projection
           }),
-          fill: new Fill({
-            color: 'rgba(0, 255, 0, 0.1)',
+        });
+
+        const vectorLayer = new VectorLayer({
+          source: vectorSource,
+          style: new Style({
+            stroke: new Stroke({
+              color: 'green',
+              width: 1.5,
+            }),
+            fill: new Fill({
+              color: 'rgba(0, 255, 0, 0.1)',
+            }),
           }),
-        }),
+        });
+
+        mapRef.current?.addLayer(vectorLayer);
+
+        // ✅ Fit map to features
+        mapRef.current?.getView().fit(vectorSource.getExtent(), {
+          padding: [20, 20, 20, 20],
+          maxZoom: 17,
+        });
+      })
+      .catch((err) => {
+        console.error('Error loading GeoJSON:', err);
       });
-
-      mapRef.current?.addLayer(vectorLayer);
-
-      // ✅ Fit map to features
-      mapRef.current?.getView().fit(vectorSource.getExtent(), {
-        padding: [20, 20, 20, 20],
-        maxZoom: 17,
-      });
-    })
-    .catch((err) => {
-      console.error('Error loading GeoJSON:', err);
-    });
-}, []);
-
-
-
-
-
-
-
-
-
+  }, []);
 
 
   //UI Downstairs
