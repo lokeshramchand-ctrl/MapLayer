@@ -16,7 +16,6 @@ import Point from 'ol/geom/Point';
 import Feature from 'ol/Feature';
 
 const OpenLayersMap = () => {
-  // const [term, setTerm] = useState({});
   const [term, setTerm] = useState<string>('');
   const [address, setAddress] = useState();
 
@@ -65,7 +64,6 @@ useEffect(() => {
       zoom: 15,
     }));
 
-    // 🧷 Marker logic
     const markerFeature = new Feature({
       geometry: new Point(coords),
     });
@@ -87,16 +85,10 @@ useEffect(() => {
     mapRef.current!.addLayer(markerLayer);
     markerLayerRef.current = markerLayer;
 
-    // 🌍 Radius
     const radius = 100;
-
-    // 🔷 Parcel URL
     const parcelUrl = `https://geo.sandag.org/server/rest/services/Hosted/Parcels/FeatureServer/0/query?geometry=${lon},${lat}&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=${radius}&units=esriSRUnit_Meter&outFields=*&returnGeometry=true&f=geojson`;
-
-    // 🔷 Sewer URL
     const sewerUrl = `https://geo.sandag.org/server/rest/services/Hosted/Sewer_Main_SD/FeatureServer/0/query?geometry=${lon},${lat}&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=${radius}&units=esriSRUnit_Meter&outFields=*&returnGeometry=true&f=geojson`;
 
-    // 🚧 Fetch Parcels
     fetch(parcelUrl)
       .then((res) => res.json())
       .then((parcelData) => {
@@ -122,7 +114,6 @@ useEffect(() => {
         parcelLayerRef.current = parcelLayer;
       });
 
-    // 🚧 Fetch Sewer
     fetch(sewerUrl)
       .then((res) => res.json())
       .then((sewerData) => {
