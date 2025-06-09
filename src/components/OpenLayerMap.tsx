@@ -7,13 +7,13 @@ import { fromLonLat } from 'ol/proj';
 import { Coordinate } from 'ol/coordinate';
 import VectorLayer from 'ol/layer/Vector';
 import VectorSource from 'ol/source/Vector';
-import GeoJSON from 'ol/format/GeoJSON';
 import Style from 'ol/style/Style';
 import Stroke from 'ol/style/Stroke';
 import Fill from 'ol/style/Fill';
 import Icon from 'ol/style/Icon';
 import Point from 'ol/geom/Point';
 import Feature from 'ol/Feature';
+import {loadAndRenderGeoJsonLayer} from './Methods/Layers'
 
 const OpenLayersMap = () => {
   const [term, setTerm] = useState<string>('');
@@ -85,60 +85,31 @@ useEffect(() => {
     mapRef.current!.addLayer(markerLayer);
     markerLayerRef.current = markerLayer;
 
-    const radius = 100;
+    const radius = 1;
     const parcelUrl = `https://geo.sandag.org/server/rest/services/Hosted/Parcels/FeatureServer/0/query?geometry=${lon},${lat}&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=${radius}&units=esriSRUnit_Meter&outFields=*&returnGeometry=true&f=geojson`;
     const sewerUrl = `https://geo.sandag.org/server/rest/services/Hosted/Sewer_Main_SD/FeatureServer/0/query?geometry=${lon},${lat}&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=${radius}&units=esriSRUnit_Meter&outFields=*&returnGeometry=true&f=geojson`;
+ // 🟩 Parcel Layer
+      loadAndRenderGeoJsonLayer(
+        parcelUrl,
+        mapRef.current!,
+        parcelLayerRef,
+        new Style({
+          stroke: new Stroke({ color: 'green', width: 1.5 }),
+          fill: new Fill({ color: 'rgba(0, 255, 0, 0.1)' }),
+        })
+      );
 
-    fetch(parcelUrl)
-      .then((res) => res.json())
-      .then((parcelData) => {
-        if (parcelLayerRef.current) {
-          mapRef.current?.removeLayer(parcelLayerRef.current);
-        }
-
-        const parcelSource = new VectorSource({
-          features: new GeoJSON().readFeatures(parcelData, {
-            featureProjection: 'EPSG:3857',
-          }),
-        });
-
-        const parcelLayer = new VectorLayer({
-          source: parcelSource,
-          style: new Style({
-            stroke: new Stroke({ color: 'green', width: 1.5 }),
-            fill: new Fill({ color: 'rgba(0, 255, 0, 0.1)' }),
-          }),
-        });
-
-        mapRef.current?.addLayer(parcelLayer);
-        parcelLayerRef.current = parcelLayer;
-      });
-
-    fetch(sewerUrl)
-      .then((res) => res.json())
-      .then((sewerData) => {
-        if (sewerLayerRef.current) {
-          mapRef.current?.removeLayer(sewerLayerRef.current);
-        }
-
-        const sewerSource = new VectorSource({
-          features: new GeoJSON().readFeatures(sewerData, {
-            featureProjection: 'EPSG:3857',
-          }),
-        });
-
-        const sewerLayer = new VectorLayer({
-          source: sewerSource,
-          style: new Style({
-            stroke: new Stroke({ color: 'blue', width: 2 }),
-          }),
-        });
-
-        mapRef.current?.addLayer(sewerLayer);
-        sewerLayerRef.current = sewerLayer;
-      });
-  }
-}, [address]);
+      // 🔵 Sewer Layer
+      loadAndRenderGeoJsonLayer(
+        sewerUrl,
+        mapRef.current!,
+        sewerLayerRef,
+        new Style({
+          stroke: new Stroke({ color: 'blue', width: 2 }),
+        })
+      );
+    }
+  }, [address]);
 
 
   //UI Downstairs
