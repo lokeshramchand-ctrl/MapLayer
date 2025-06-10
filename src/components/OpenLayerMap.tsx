@@ -8,12 +8,11 @@ import { Coordinate } from 'ol/coordinate';
 import VectorLayer from 'ol/layer/Vector';
 import VectorSource from 'ol/source/Vector';
 import Style from 'ol/style/Style';
-import Stroke from 'ol/style/Stroke';
-import Fill from 'ol/style/Fill';
+import { layerConfigs } from './Methods/LayerConfig';
 import Icon from 'ol/style/Icon';
 import Point from 'ol/geom/Point';
 import Feature from 'ol/Feature';
-import {loadAndRenderGeoJsonLayer} from './Methods/Layers'
+import { loadAndRenderGeoJsonLayer } from './Methods/Layers'
 
 const OpenLayersMap = () => {
   const [term, setTerm] = useState<string>('');
@@ -38,74 +37,67 @@ const OpenLayersMap = () => {
   const [clickedCoordinate, setClickedCoordinate] = useState<Coordinate>();
   const mapRef = useRef<Map | null>(null);
   const markerLayerRef = useRef<VectorLayer | null>(null);
-  const parcelLayerRef = useRef<VectorLayer | null>(null);
-  const sewerLayerRef = useRef<VectorLayer | null>(null);
+  const layerRefs = useRef<Record<string, React.MutableRefObject<VectorLayer | null>>>(
+    Object.fromEntries(
+      layerConfigs.map((layer) => [layer.topic, { current: null }])
+    )
+  );
 
-useEffect(() => {
-  if (!mapRef.current) {
-    const map = new Map({
-      target: mapDivRef.current as HTMLDivElement,
-      layers: [new TileLayer({ source: new OSM() })],
-    });
-    mapRef.current = map;
+  useEffect(() => {
+    if (!mapRef.current) {
+      const map = new Map({
+        target: mapDivRef.current as HTMLDivElement,
+        layers: [new TileLayer({ source: new OSM() })],
+      });
+      mapRef.current = map;
 
-    map.on('click', (e) => {
-      setClickedCoordinate(e.coordinate);
-    });
-  }
-
-  if (address && address.length > 0) {
-    const lat = parseFloat(address[0].lat);
-    const lon = parseFloat(address[0].lon);
-    const coords = fromLonLat([lon, lat]);
-
-    mapRef.current!.setView(new View({
-      center: coords,
-      zoom: 15,
-    }));
-
-    const markerFeature = new Feature({
-      geometry: new Point(coords),
-    });
-
-    markerFeature.setStyle(new Style({
-      image: new Icon({
-        anchor: [0.5, 1],
-        src: 'https://cdn-icons-png.flaticon.com/512/684/684908.png',
-        scale: 0.05,
-      }),
-    }));
-
-    const markerSource = new VectorSource({ features: [markerFeature] });
-    const markerLayer = new VectorLayer({ source: markerSource });
-
-    if (markerLayerRef.current) {
-      mapRef.current!.removeLayer(markerLayerRef.current);
+      map.on('click', (e) => {
+        setClickedCoordinate(e.coordinate);
+      });
     }
-    mapRef.current!.addLayer(markerLayer);
-    markerLayerRef.current = markerLayer;
 
-    const radius = 1;
-    const parcelUrl = `https://geo.sandag.org/server/rest/services/Hosted/Parcels/FeatureServer/0/query?geometry=${lon},${lat}&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=${radius}&units=esriSRUnit_Meter&outFields=*&returnGeometry=true&f=geojson`;
-    const sewerUrl = `https://geo.sandag.org/server/rest/services/Hosted/Sewer_Main_SD/FeatureServer/0/query?geometry=${lon},${lat}&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=${radius}&units=esriSRUnit_Meter&outFields=*&returnGeometry=true&f=geojson`;
-      loadAndRenderGeoJsonLayer(
-        parcelUrl,
-        mapRef.current!,
-        parcelLayerRef,
-        new Style({
-          stroke: new Stroke({ color: 'green', width: 1.5 }),
-          fill: new Fill({ color: 'rgba(0, 255, 0, 0.1)' }),
-        })
-      );
+    if (address && address.length > 0) {
+      const lat = parseFloat(address[0].lat);
+      const lon = parseFloat(address[0].lon);
+      const coords = fromLonLat([lon, lat]);
 
-      loadAndRenderGeoJsonLayer(
-        sewerUrl,
-        mapRef.current!,
-        sewerLayerRef,
-        new Style({
-          stroke: new Stroke({ color: 'blue', width: 2 }),
-        })
-      );
+      mapRef.current!.setView(new View({
+        center: coords,
+        zoom: 15,
+      }));
+
+      const markerFeature = new Feature({
+        geometry: new Point(coords),
+      });
+
+      markerFeature.setStyle(new Style({
+        image: new Icon({
+          anchor: [0.5, 1],
+          src: 'https://cdn-icons-png.flaticon.com/512/684/684908.png',
+          scale: 0.05,
+        }),
+      }));
+
+      const markerSource = new VectorSource({ features: [markerFeature] });
+      const markerLayer = new VectorLayer({ source: markerSource });
+
+      if (markerLayerRef.current) {
+        mapRef.current!.removeLayer(markerLayerRef.current);
+      }
+      mapRef.current!.addLayer(markerLayer);
+      markerLayerRef.current = markerLayer;
+
+      layerConfigs.forEach((layerConfig) => {
+        const url = layerConfig.getUrl(lon, lat, layerConfig.radius);
+        const ref = layerRefs.current[layerConfig.topic];
+
+        loadAndRenderGeoJsonLayer(
+          url,
+          mapRef.current!,
+          ref,
+          layerConfig.style
+        );
+      });
     }
   }, [address]);
 
