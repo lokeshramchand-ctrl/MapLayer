@@ -88,7 +88,6 @@ useEffect(() => {
     const radius = 1;
     const parcelUrl = `https://geo.sandag.org/server/rest/services/Hosted/Parcels/FeatureServer/0/query?geometry=${lon},${lat}&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=${radius}&units=esriSRUnit_Meter&outFields=*&returnGeometry=true&f=geojson`;
     const sewerUrl = `https://geo.sandag.org/server/rest/services/Hosted/Sewer_Main_SD/FeatureServer/0/query?geometry=${lon},${lat}&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=${radius}&units=esriSRUnit_Meter&outFields=*&returnGeometry=true&f=geojson`;
- // 🟩 Parcel Layer
       loadAndRenderGeoJsonLayer(
         parcelUrl,
         mapRef.current!,
@@ -99,7 +98,6 @@ useEffect(() => {
         })
       );
 
-      // 🔵 Sewer Layer
       loadAndRenderGeoJsonLayer(
         sewerUrl,
         mapRef.current!,

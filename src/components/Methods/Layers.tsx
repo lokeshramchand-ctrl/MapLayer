@@ -16,6 +16,7 @@ export const loadAndRenderGeoJsonLayer = async (
     const res = await fetch(url);
     const geojsonData = await res.json();
 
+
     if (layerRef.current) {
       map.removeLayer(layerRef.current);
     }
