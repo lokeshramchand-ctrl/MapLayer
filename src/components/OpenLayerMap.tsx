@@ -85,7 +85,7 @@ useEffect(() => {
     mapRef.current!.addLayer(markerLayer);
     markerLayerRef.current = markerLayer;
 
-    const radius = 100;
+    const radius = 10;
     const parcelUrl = `https://geo.sandag.org/server/rest/services/Hosted/Parcels/FeatureServer/0/query?geometry=${lon},${lat}&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=${radius}&units=esriSRUnit_Meter&outFields=*&returnGeometry=true&f=geojson`;
     const sewerUrl = `https://geo.sandag.org/server/rest/services/Hosted/Sewer_Main_SD/FeatureServer/0/query?geometry=${lon},${lat}&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=${radius}&units=esriSRUnit_Meter&outFields=*&returnGeometry=true&f=geojson`;
 
