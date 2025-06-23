@@ -8,7 +8,7 @@ pipeline
             steps
             {
                 echo 'Starting Build...'
-		docker build . -t "sample-project:v1.0"
+		        docker build .
 
                 // Delete old and create new out folder
                 //sh 'rm -rf out && mkdir out -p'
