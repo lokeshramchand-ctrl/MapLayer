@@ -33,7 +33,7 @@ const OpenLayersMap = () => {
     );
     setLayerVisibility(initialVisibility);
     
-    alert(term);
+   // alert(term);
   }
 
   const mapDivRef = useRef<HTMLDivElement>(null);
