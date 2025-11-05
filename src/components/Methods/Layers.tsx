@@ -128,6 +128,15 @@ const baseConfigs: Omit<LayerConfig, 'getUrl'>[] = [
     }),
 
   },
+   {
+    radius: 100000,
+    topic: 'Parks',
+    style: new Style({
+      stroke: new Stroke({ color: 'green', width: 2.5 }),
+      fill: new Fill({ color: 'rgba(3, 255, 16, 0.1)' }),
+    }),
+
+  },
 
 ];
 
