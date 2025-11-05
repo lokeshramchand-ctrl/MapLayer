@@ -90,8 +90,27 @@ const baseConfigs: Omit<LayerConfig, 'getUrl'>[] = [
       stroke: new Stroke({ color: 'darkblue', width: 2.5 }),
       fill: new Fill({ color: 'rgba(116, 3, 255, 0.1)' }),
     }),
-
+    
   },
+  {
+   radius: 100000,
+   topic: 'Parks',
+   style: new Style({
+     stroke: new Stroke({ color: 'green', width: 2.5 }),
+     fill: new Fill({ color: 'rgba(3, 255, 16, 0.1)' }),
+   }),
+
+ },
+  {
+   radius: 100000,
+   topic: 'Transit_Stops_GTFS',
+   style: new Style({
+     stroke: new Stroke({ color: 'green', width: 2.5 }),
+     fill: new Fill({ color: 'rgba(3, 255, 16, 0.1)' }),
+   }),
+
+ },
+ 
     {
     radius: 100000,
     topic: 'Airport_Influence_Area',
@@ -125,15 +144,6 @@ const baseConfigs: Omit<LayerConfig, 'getUrl'>[] = [
     style: new Style({
       stroke: new Stroke({ color: 'yellow', width: 1.5 }),
       fill: new Fill({ color: 'rgba(116, 3, 255, 0.1)' }),
-    }),
-
-  },
-   {
-    radius: 100000,
-    topic: 'Parks',
-    style: new Style({
-      stroke: new Stroke({ color: 'green', width: 2.5 }),
-      fill: new Fill({ color: 'rgba(3, 255, 16, 0.1)' }),
     }),
 
   },
