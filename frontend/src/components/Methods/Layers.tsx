@@ -28,7 +28,7 @@ const baseConfigs: Omit<LayerConfig, 'getUrl'>[] = [
     topic: 'Sewer_Main_SD',
     style: new Style({
       stroke: new Stroke({ color: 'purple', width: 2 }),
-    }),
+    }), 
   },
   {
     radius: 50,
