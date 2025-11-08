@@ -1,0 +1,16 @@
+module.exports = [
+  { topic: 'Parcels', radius: 1 },
+  { topic: 'Sewer_Main_SD', radius: 100 },
+  { topic: 'Zoning_Base_SD', radius: 50 },
+  { topic: 'Water_Main_SD', radius: 50 },
+  { topic: 'Sustainable_Development_Areas', radius: 1000 },
+  { topic: 'Housing_Solution_Areas', radius: 1000 },
+  { topic: 'Promise_Zones_SD', radius: 100000 },
+  { topic: 'MHPA_SD', radius: 100000 },
+  { topic: 'Coastal_Zones', radius: 100000 },
+  { topic: 'Community_Plan_Implementation_Overlay_Zone_SD', radius: 100000 },
+  { topic: 'Airport_Influence_Area', radius: 100000 },
+  { topic: 'Historic_Districts_SD', radius: 100000 },
+  { topic: 'HRB_Designated_Resources_SD', radius: 100000 },
+  { topic: 'Fire_Hazard_Severity_Zones_SD', radius: 100000 },
+];
