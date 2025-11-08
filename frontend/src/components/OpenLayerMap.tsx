@@ -12,7 +12,7 @@ import { addMarker } from './Methods/Marker';
 
 const OpenLayersMap = () => {
   const [term, setTerm] = useState<string>('');
-  const [address, setAddress] = useState();
+  const [address, setAddress] = useState<any[] | null>(null);
   const [layerVisibility, setLayerVisibility] = useState<Record<string, boolean>>({});
   const [searchCompleted, setSearchCompleted] = useState(false);
 
@@ -35,6 +35,7 @@ const OpenLayersMap = () => {
     
    // alert(term);
   }
+const backendBase = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8080';
 
   const mapDivRef = useRef<HTMLDivElement>(null);
   const [clickedCoordinate, setClickedCoordinate] = useState<Coordinate>();
@@ -89,16 +90,12 @@ const OpenLayersMap = () => {
 
       markerLayerRef.current = addMarker(coords, mapRef.current!, markerLayerRef.current);
       
-      layerConfigs.forEach((layerConfig) => {
-        const url = layerConfig.getUrl(lon, lat, layerConfig.radius);
-        const ref = layerRefs.current[layerConfig.topic];
-        loadAndRenderGeoJsonLayer(
-          url,
-          mapRef.current!,
-          ref,
-          layerConfig.style
-        );
-      });
+     layerConfigs.forEach((layerConfig) => {
+    const url = `${backendBase}/api/layer?topic=${encodeURIComponent(layerConfig.topic)}&lon=${lon}&lat=${lat}&radius=${layerConfig.radius}`;
+  const ref = layerRefs.current[layerConfig.topic];
+  loadAndRenderGeoJsonLayer(url, mapRef.current!, ref, layerConfig.style);
+});
+
     }
   }, [address]);
 

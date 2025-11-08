@@ -5,16 +5,11 @@ import { Style, Stroke, Fill } from 'ol/style';
 export interface LayerConfig {
   radius: number;
   topic: string;
-  getUrl: (lon: number, lat: number, radius: number) => string;
   style: Style;
 }
 
-const buildUrl =
-  (topic: string) =>
-    (lon: number, lat: number, radius: number) =>
-      `https://geo.sandag.org/server/rest/services/Hosted/${topic}/FeatureServer/0/query?geometry=${lon},${lat}&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&distance=${radius}&units=esriSRUnit_Meter&outFields=*&returnGeometry=true&f=geojson`;
-
-const baseConfigs: Omit<LayerConfig, 'getUrl'>[] = [
+// ✅ These are the same — only difference: no getUrl, no buildUrl
+export const layerConfigs: LayerConfig[] = [
   {
     radius: 1,
     topic: 'Parcels',
@@ -28,7 +23,7 @@ const baseConfigs: Omit<LayerConfig, 'getUrl'>[] = [
     topic: 'Sewer_Main_SD',
     style: new Style({
       stroke: new Stroke({ color: 'purple', width: 2 }),
-    }), 
+    }),
   },
   {
     radius: 50,
@@ -90,67 +85,53 @@ const baseConfigs: Omit<LayerConfig, 'getUrl'>[] = [
       stroke: new Stroke({ color: 'darkblue', width: 2.5 }),
       fill: new Fill({ color: 'rgba(116, 3, 255, 0.1)' }),
     }),
-    
   },
   {
-   radius: 100000,
-   topic: 'Parks',
-   style: new Style({
-     stroke: new Stroke({ color: 'green', width: 2.5 }),
-     fill: new Fill({ color: 'rgba(3, 255, 16, 0.1)' }),
-   }),
-
- },
+    radius: 100000,
+    topic: 'Parks',
+    style: new Style({
+      stroke: new Stroke({ color: 'green', width: 2.5 }),
+      fill: new Fill({ color: 'rgba(3, 255, 16, 0.1)' }),
+    }),
+  },
   {
-   radius: 100000,
-   topic: 'Transit_Stops_GTFS',
-   style: new Style({
-     stroke: new Stroke({ color: 'green', width: 2.5 }),
-     fill: new Fill({ color: 'rgba(3, 255, 16, 0.1)' }),
-   }),
-
- },
- 
-    {
+    radius: 100000,
+    topic: 'Transit_Stops_GTFS',
+    style: new Style({
+      stroke: new Stroke({ color: 'green', width: 2.5 }),
+      fill: new Fill({ color: 'rgba(3, 255, 16, 0.1)' }),
+    }),
+  },
+  {
     radius: 100000,
     topic: 'Airport_Influence_Area',
     style: new Style({
       stroke: new Stroke({ color: 'darkyellow', width: 2.5 }),
       fill: new Fill({ color: 'rgba(116, 3, 255, 0.1)' }),
     }),
-
   },
-    {
+  {
     radius: 100000,
     topic: 'Historic_Districts_SD',
     style: new Style({
       stroke: new Stroke({ color: 'white', width: 2.5 }),
       fill: new Fill({ color: 'rgba(116, 3, 255, 0.1)' }),
     }),
-
   },
-      {
+  {
     radius: 100000,
     topic: 'HRB_Designated_Resources_SD',
     style: new Style({
       stroke: new Stroke({ color: 'darkgreen', width: 2.5 }),
       fill: new Fill({ color: 'rgba(116, 3, 255, 0.1)' }),
     }),
-
   },
-      {
+  {
     radius: 100000,
     topic: 'Fire_Hazard_Severity_Zones_SD',
     style: new Style({
       stroke: new Stroke({ color: 'yellow', width: 1.5 }),
       fill: new Fill({ color: 'rgba(116, 3, 255, 0.1)' }),
     }),
-
   },
-
 ];
-
-export const layerConfigs: LayerConfig[] = baseConfigs.map(cfg => ({
-  ...cfg,
-  getUrl: buildUrl(cfg.topic),
-}));
