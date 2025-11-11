@@ -6,4 +6,4 @@ RUN npm ci --omit=dev
 
 COPY . .
 EXPOSE 8080
-CMD ["npm", "start"]
+CMD ["node", "src/server.js"]

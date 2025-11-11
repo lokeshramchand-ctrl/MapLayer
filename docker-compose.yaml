@@ -1,0 +1,29 @@
+version: "3.9"
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: maplayer_backend
+    ports:
+      - "8085:8080"
+    env_file:
+      - ./backend/.env
+    environment:
+      - NODE_ENV=production
+      - CORS_ORIGIN=http://localhost:5173
+    restart: always
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: maplayer_frontend
+    ports:
+      - "5173:80"
+    environment:
+      - VITE_BACKEND_URL=http://localhost:8080
+    depends_on:
+      - backend
+    restart: always
