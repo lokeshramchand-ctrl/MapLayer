@@ -1,8 +1,9 @@
+// filepath: [db.config.js](http://_vscodecontentref_/0)
 module.exports = {
-  HOST: "localhost",
-  USER: "postgres",
-  PASSWORD: "123",
-  DB: "testdb",
+  HOST: process.env.DB_HOST || "localhost",
+  USER: process.env.DB_USER || "postgres",
+  PASSWORD: process.env.DB_PASSWORD || "123",
+  DB: process.env.DB_NAME || "testdb",
   dialect: "postgres",
   pool: {
     max: 5,
