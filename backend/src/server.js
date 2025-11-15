@@ -3,9 +3,7 @@ const express = require('express');
 const cors = require('cors');
 const fetch = require('node-fetch');
 
-const { client, requestCounter, responseHistogram } = require('./metrics');
 const { topicIndex, getBaseRadius } = require('./topics');
-const { makeKey, getCached, setCached } = require('./cache');
 
 const app = express();
 
@@ -14,6 +12,28 @@ app.use(cors({
   origin: process.env.CORS_ORIGIN?.split(',').map(s => s.trim()) || '*',
   credentials: false,
 }));
+
+// Simple in-memory cache
+const cache = new Map();
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+function makeKey({ topic, lon, lat, radius }) {
+  return `${topic}:${lon}:${lat}:${radius}`;
+}
+
+function getCached(key) {
+  const entry = cache.get(key);
+  if (!entry) return null;
+  if (Date.now() - entry.timestamp > CACHE_TTL) {
+    cache.delete(key);
+    return null;
+  }
+  return entry.data;
+}
+
+function setCached(key, data) {
+  cache.set(key, { data, timestamp: Date.now() });
+}
 
 // Health
 app.get('/health', (_req, res) => res.json({ ok: true }));
@@ -48,8 +68,7 @@ app.get('/api/layer', async (req, res) => {
     const cacheKey = makeKey({ topic, lon, lat, radius });
     const cached = getCached(cacheKey);
     if (cached) {
-      // count & return cached response quickly
-      requestCounter.labels(topic).inc();
+      console.log(`Cache hit for ${topic}`);
       return res.json(cached);
     }
 
@@ -65,17 +84,14 @@ app.get('/api/layer', async (req, res) => {
       `&returnGeometry=true` +
       `&f=geojson`;
 
-    const endTimer = responseHistogram.labels(topic).startTimer();
-    requestCounter.labels(topic).inc();
+    console.log(`Fetching ${topic} from upstream...`);
 
     const upstream = await fetch(url, { timeout: Number(process.env.FETCH_TIMEOUT_MS || 15000) });
     if (!upstream.ok) {
-      endTimer();
       return res.status(upstream.status).json({ error: `Upstream error ${upstream.status}` });
     }
 
     const data = await upstream.json();
-    endTimer();
 
     setCached(cacheKey, data);
 
@@ -86,17 +102,10 @@ app.get('/api/layer', async (req, res) => {
   }
 });
 
-// Prometheus metrics
-app.get('/metrics', async (_req, res) => {
-  try {
-    res.set('Content-Type', client.register.contentType);
-    res.end(await client.register.metrics());
-  } catch (err) {
-    res.status(500).end(err.message);
-  }
-});
-
-const PORT = Number(process.env.PORT || 8080);
+const PORT = Number(process.env.PORT || 8085);
 app.listen(PORT, () => {
   console.log(`Backend listening on :${PORT}`);
+}).on('error', (err) => {
+  console.error('Failed to start server:', err);
+  process.exit(1);
 });

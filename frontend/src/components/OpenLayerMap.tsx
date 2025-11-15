@@ -9,6 +9,7 @@ import VectorLayer from 'ol/layer/Vector';
 import { layerConfigs } from './Methods/Layers';
 import { loadAndRenderGeoJsonLayer } from './Methods/GeoJson_Load'
 import { addMarker } from './Methods/Marker';
+const BACKEND_BASE = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8085';
 
 const OpenLayersMap = () => {
   const [term, setTerm] = useState<string>('');
@@ -35,7 +36,6 @@ const OpenLayersMap = () => {
     
    // alert(term);
   }
-const backendBase = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8080';
 
   const mapDivRef = useRef<HTMLDivElement>(null);
   const [clickedCoordinate, setClickedCoordinate] = useState<Coordinate>();
@@ -91,7 +91,7 @@ const backendBase = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8080';
       markerLayerRef.current = addMarker(coords, mapRef.current!, markerLayerRef.current);
       
      layerConfigs.forEach((layerConfig) => {
-    const url = `${backendBase}/api/layer?topic=${encodeURIComponent(layerConfig.topic)}&lon=${lon}&lat=${lat}&radius=${layerConfig.radius}`;
+    const url = `${BACKEND_BASE}/api/layer?topic=${encodeURIComponent(layerConfig.topic)}&lon=${lon}&lat=${lat}&radius=${layerConfig.radius}`;
   const ref = layerRefs.current[layerConfig.topic];
   loadAndRenderGeoJsonLayer(url, mapRef.current!, ref, layerConfig.style);
 });
