@@ -1,42 +1,30 @@
-#root {
-    max-width: 1280px;
-    margin: 0 auto;
-    padding: 2rem;
-    text-align: center;
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600&display=swap');
+
+:root {
+  --bg-color: #050505;
+  --text-main: #ffffff;
+  --text-muted: #888888;
+  --card-bg: rgba(255, 255, 255, 0.03);
+  --border-color: rgba(255, 255, 255, 0.08);
+  --accent: #00F0FF;
 }
 
-.map {
-    position: absolute;
-    top: 0;
-    bottom: 25px;
-    left: 0;
-    width: 100%;
+[data-theme='light'] {
+  --bg-color: #F4F4F5;
+  --text-main: #18181B;
+  --text-muted: #52525B;
+  --card-bg: rgba(255, 255, 255, 0.6);
+  --border-color: rgba(0, 0, 0, 0.08);
+  --accent: #0070F3;
 }
 
-.coordinates-container {
-    position: absolute;
-    bottom: -2px;
+body {
+  background-color: var(--bg-color);
+  color: var(--text-main);
+  transition: background-color 0.5s ease, color 0.5s ease;
 }
 
-.ol-popup{
-  position: absolute;
-  background-color: white;
-  padding: 5px;
-  border-radius: 5px;
-  border: 1px solid black;
-  transform: translate(-50%, -100%);
-  pointer-events: none;
-  width: 220px;
-  color: black;
-};
-
-.input {
-  margin-bottom: 30px;
-  padding: 5px 15px;
-  width: 300px;
-}
-
-.btn {
-  padding: 5px 10px;
-  cursor: pointer;
-}
+/* Hide Scrollbar for cleaner look */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(128, 128, 128, 0.4); border-radius: 4px; }
