@@ -1,21 +1,30 @@
-
 import './App.css'
+import { useState } from 'react';
 import OpenLayerMap from './components/OpenLayerMap';
 import OpenLayerEsri from './components/OpenLayerEsri';
 import LegiScanAPI from './components/LegiScanAPI';
 import { BrowserRouter as Router, Route, Routes } from "react-router-dom";
+import LandingPage from './components/LandingPage';
+import ProjectShowcase from './components/Projectpage';
 
 function App() {
+  const [addressData, setAddressData] = useState<any>(null);
+  const [searchTerm, setSearchTerm] = useState<string>('');
 
-	
-return (
+  const handleSearchSuccess = (data: any, term: string) => {
+    setAddressData(data);
+    setSearchTerm(term);
+  };
+
+  return (
     <Router>
-    <Routes>
-        <Route path="/" element={<OpenLayerMap />} />
-        <Route path="/open" element={<OpenLayerMap />} />
+      <Routes>
+        <Route path="/" element={<ProjectShowcase />} />
+        <Route path="/site" element={<LandingPage onSearchSuccess={handleSearchSuccess} />} />
+        <Route path="/open" element={<OpenLayerMap initialAddressData={addressData} initialTerm={searchTerm} />} />
         <Route path="/esri" element={<OpenLayerEsri />} />
         <Route path="/legi" element={<LegiScanAPI />} />
-    </Routes>
+      </Routes>
     </Router>
   );
 }
