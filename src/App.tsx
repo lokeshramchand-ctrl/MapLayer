@@ -19,8 +19,7 @@ function App() {
   return (
     <Router>
       <Routes>
-        <Route path="/" element={<ProjectShowcase />} />
-        <Route path="/site" element={<LandingPage onSearchSuccess={handleSearchSuccess} />} />
+        <Route path="/" element={<LandingPage onSearchSuccess={handleSearchSuccess} />} />
         <Route path="/open" element={<OpenLayerMap initialAddressData={addressData} initialTerm={searchTerm} />} />
         <Route path="/esri" element={<OpenLayerEsri />} />
         <Route path="/legi" element={<LegiScanAPI />} />
