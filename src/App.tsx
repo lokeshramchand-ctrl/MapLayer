@@ -5,7 +5,6 @@ import OpenLayerEsri from './components/OpenLayerEsri';
 import LegiScanAPI from './components/LegiScanAPI';
 import { BrowserRouter as Router, Route, Routes } from "react-router-dom";
 import LandingPage from './components/LandingPage';
-import ProjectShowcase from './components/Projectpage';
 
 function App() {
   const [addressData, setAddressData] = useState<any>(null);
