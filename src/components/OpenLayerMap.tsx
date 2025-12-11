@@ -268,7 +268,7 @@ const MapView: React.FC<MapViewProps> = ({ initialAddressData, initialTerm }) =>
             <button 
                 className="floating-ui"
                 style={styles.actionButton}
-                onClick={() => navigate('/site')}
+                onClick={() => navigate('/')}
                 title="Go Back"
                 onMouseEnter={(e) => e.currentTarget.style.borderColor = isDarkMode ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.4)'}
                 onMouseLeave={(e) => e.currentTarget.style.borderColor = currentTheme.border}
