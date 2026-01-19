@@ -1,5 +1,4 @@
 
-
 A lightweight React + GeoJSON based mapping interface designed to visualize, explore, and interact with geospatial datasets using modern web technologies.
 
 
@@ -59,12 +58,6 @@ It enables quick visualization and experimentation with spatial datasets while s
 
 ---
 
-### **Images**
-
-<p align="center">
- <img src="./frontend/screenshots/homepage.png" width="600" /> 
- <img src="./frontend/screenshots/mainpage.png" width="600" /> 
-</p>
 
 
 ## Folder Structure
