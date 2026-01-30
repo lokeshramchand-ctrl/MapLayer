@@ -3,7 +3,7 @@ import { Map, View } from 'ol';
 import 'ol/ol.css';
 import TileLayer from 'ol/layer/Tile';
 import XYZ from 'ol/source/XYZ';
-import { fromLonLat } from 'ol/proj';
+import { fromLonLat, toLonLat } from 'ol/proj';
 import { Coordinate } from 'ol/coordinate';
 import VectorLayer from 'ol/layer/Vector';
 import { layerConfigs } from './Methods/Layers';
@@ -11,6 +11,7 @@ import { loadAndRenderGeoJsonLayer } from './Methods/GeoJson_Load';
 import { addMarker } from './Methods/Marker';
 import gsap from 'gsap';
 import { useNavigate } from 'react-router-dom';
+import { easeOut } from 'ol/easing';
 
 // --- THEME CONFIGURATION ---
 const themes = {
@@ -82,6 +83,12 @@ const MapView: React.FC<MapViewProps> = ({ initialAddressData, initialTerm }) =>
     Object.fromEntries(layerConfigs.map(layer => [layer.topic, true]))
   );
   const [clickedCoordinate, setClickedCoordinate] = useState<Coordinate>();
+  const [mapStats, setMapStats] = useState({
+    zoom: 2,
+    center: [0, 0] as Coordinate,
+    rotation: 0,
+    size: { width: 0, height: 0 }
+  });
 
   // -- REFS --
   const mapDivRef = useRef<HTMLDivElement>(null);
@@ -130,6 +137,20 @@ const MapView: React.FC<MapViewProps> = ({ initialAddressData, initialTerm }) =>
 
       mapRef.current = map;
       map.on('click', (e) => setClickedCoordinate(e.coordinate));
+      map.on('moveend', () => {
+        const view = map.getView();
+        const center = view.getCenter() ?? [0, 0];
+        const zoom = view.getZoom() ?? 0;
+        const rotation = view.getRotation() ?? 0;
+        const size = map.getSize();
+
+        setMapStats({
+          center,
+          zoom,
+          rotation,
+          size: { width: size?.[0] ?? 0, height: size?.[1] ?? 0 }
+        });
+      });
     }
   }, []);
 
@@ -150,7 +171,7 @@ const MapView: React.FC<MapViewProps> = ({ initialAddressData, initialTerm }) =>
       const lon = parseFloat(initialAddressData[0].lon);
       const coords = fromLonLat([lon, lat]);
 
-      mapRef.current!.getView().animate({ center: coords, zoom: 14, duration: 2500, ease: (t) => Math.pow(t, 2) });
+      mapRef.current!.getView().animate({ center: coords, zoom: 14, duration: 2500, easing: easeOut });
       markerLayerRef.current = addMarker(coords, mapRef.current!, markerLayerRef.current);
       
       layerConfigs.forEach((layerConfig) => {
@@ -170,6 +191,10 @@ const MapView: React.FC<MapViewProps> = ({ initialAddressData, initialTerm }) =>
   };
 
   const formatLayerName = (topic: string) => topic.replace(/_/g, ' ').replace(/SD$/, '').trim();
+  const formatNumber = (value: number, digits = 2) => Number.isFinite(value) ? value.toFixed(digits) : '—';
+  const centerLonLat = toLonLat(mapStats.center);
+  const clickedLonLat = clickedCoordinate ? toLonLat(clickedCoordinate) : null;
+  const activeLayerCount = Object.values(layerVisibility).filter(Boolean).length;
 
   // -- STYLES --
   const styles = {
@@ -245,6 +270,75 @@ const MapView: React.FC<MapViewProps> = ({ initialAddressData, initialTerm }) =>
         borderRadius: '8px', border: `1px solid ${currentTheme.border}`,
         boxShadow: currentTheme.shadow,
         transition: 'background 0.3s, color 0.3s'
+    },
+    rightSidebar: {
+      position: 'absolute' as const,
+      top: '92px',
+      right: '24px',
+      width: '320px',
+      maxHeight: 'calc(100% - 140px)',
+      display: 'flex',
+      flexDirection: 'column' as const,
+      gap: '12px',
+      pointerEvents: 'auto' as const,
+      zIndex: 1100
+    },
+    sidebarCard: {
+      background: currentTheme.glass,
+      backdropFilter: 'blur(20px)',
+      WebkitBackdropFilter: 'blur(20px)',
+      border: `1px solid ${currentTheme.border}`,
+      borderRadius: '16px',
+      padding: '16px',
+      boxShadow: currentTheme.shadow,
+      transition: 'all 0.3s ease'
+    },
+    sidebarTitle: {
+      fontSize: '11px',
+      fontWeight: 700,
+      letterSpacing: '1px',
+      color: currentTheme.textMuted,
+      textTransform: 'uppercase' as const,
+      marginBottom: '12px'
+    },
+    statRow: {
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      padding: '6px 0',
+      borderBottom: `1px dashed ${currentTheme.border}`
+    },
+    statLabel: {
+      fontSize: '12px',
+      color: currentTheme.textMuted
+    },
+    statValue: {
+      fontSize: '12px',
+      fontWeight: 600,
+      color: currentTheme.textMain
+    },
+    layerMetaRow: {
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      gap: '12px',
+      padding: '8px 0',
+      borderBottom: `1px dashed ${currentTheme.border}`
+    },
+    layerMetaName: {
+      fontSize: '12px',
+      color: currentTheme.textMain,
+      display: 'flex',
+      alignItems: 'center',
+      gap: '8px'
+    },
+    layerMetaBadge: {
+      fontSize: '10px',
+      fontWeight: 600,
+      padding: '2px 8px',
+      borderRadius: '999px',
+      border: `1px solid ${currentTheme.border}`,
+      color: currentTheme.textMuted
     }
   };
 
@@ -340,6 +434,62 @@ const MapView: React.FC<MapViewProps> = ({ initialAddressData, initialTerm }) =>
                 LOCATION_LOCK: {clickedCoordinate[1].toFixed(4)} N, {clickedCoordinate[0].toFixed(4)} E
             </div>
         )}
+
+        {/* RIGHT SIDEBAR */}
+        <div className="floating-ui" style={styles.rightSidebar}>
+          <div style={styles.sidebarCard}>
+            <div style={styles.sidebarTitle}>General Values</div>
+            <div style={styles.statRow}>
+              <span style={styles.statLabel}>Height</span>
+              <span style={styles.statValue}>{mapStats.size.height ? `${mapStats.size.height}px` : '—'}</span>
+            </div>
+            <div style={styles.statRow}>
+              <span style={styles.statLabel}>Depth</span>
+              <span style={styles.statValue}>{mapStats.size.width ? `${mapStats.size.width}px` : '—'}</span>
+            </div>
+            <div style={styles.statRow}>
+              <span style={styles.statLabel}>Zoom</span>
+              <span style={styles.statValue}>{formatNumber(mapStats.zoom, 2)}</span>
+            </div>
+            <div style={styles.statRow}>
+              <span style={styles.statLabel}>Center</span>
+              <span style={styles.statValue}>{formatNumber(centerLonLat[1], 4)} N / {formatNumber(centerLonLat[0], 4)} E</span>
+            </div>
+            <div style={styles.statRow}>
+              <span style={styles.statLabel}>Last Click</span>
+              <span style={styles.statValue}>{clickedLonLat ? `${formatNumber(clickedLonLat[1], 4)} N / ${formatNumber(clickedLonLat[0], 4)} E` : '—'}</span>
+            </div>
+            <div style={{ ...styles.statRow, borderBottom: 'none' }}>
+              <span style={styles.statLabel}>Layers On</span>
+              <span style={styles.statValue}>{activeLayerCount}/{layerConfigs.length}</span>
+            </div>
+          </div>
+
+          <div style={styles.sidebarCard}>
+            <div style={styles.sidebarTitle}>Layer Values</div>
+            <div className="custom-scrollbar" style={{ maxHeight: '36vh', overflowY: 'auto', paddingRight: '6px' }}>
+              {layerConfigs.map((layer) => {
+                const isActive = layerVisibility[layer.topic];
+                const layerColor = extractColorFromStyle(layer.style);
+
+                return (
+                  <div key={layer.topic} style={{ ...styles.layerMetaRow, borderBottom: `1px dashed ${currentTheme.border}` }}>
+                    <div style={styles.layerMetaName}>
+                      <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: layerColor, boxShadow: `0 0 8px ${layerColor}`, opacity: isActive ? 1 : 0.3 }} />
+                      {formatLayerName(layer.topic)}
+                    </div>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <span style={styles.layerMetaBadge}>{layer.radius}m</span>
+                      <span style={{ ...styles.layerMetaBadge, color: isActive ? currentTheme.textMain : currentTheme.textMuted }}>
+                        {isActive ? 'On' : 'Off'}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
 
       </div>
     </div>

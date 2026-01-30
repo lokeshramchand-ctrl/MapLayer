@@ -1,4 +1,4 @@
-import './App.css'
+import './App.css';
 import { useState } from 'react';
 import OpenLayerMap from './components/OpenLayerMap';
 import OpenLayerEsri from './components/OpenLayerEsri';
