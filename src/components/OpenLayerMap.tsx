@@ -52,16 +52,13 @@ const scrollbarStyles = `
 `;
 
 const extractColorFromStyle = (style: any): string => {
-  let color: any = '#888888';
-  if (style.getStroke() && style.getStroke().getColor()) color = style.getStroke().getColor();
-  else if (style.getFill() && style.getFill().getColor()) color = style.getFill().getColor();
-
-  const colorMap: Record<string, string> = {
-    'skin': '#FFCBA4', 'darkyellow': '#FCC200', 'darkblue': '#00008B',
-    'darkgreen': '#006400', 'purple': '#800080', 'orange': '#FFA500',
-    'green': '#00FF00', 'blue': '#0000FF', 'red': '#FF0000', 'black': '#888888',
-  };
-  return colorMap[color] || color;
+  if (style.getStroke() && style.getStroke().getColor()) {
+    return style.getStroke().getColor();
+  }
+  if (style.getFill() && style.getFill().getColor()) {
+    return style.getFill().getColor();
+  }
+  return '#888888';
 };
 
 interface MapViewProps {
