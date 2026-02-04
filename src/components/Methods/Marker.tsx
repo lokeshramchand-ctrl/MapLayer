@@ -22,7 +22,7 @@ export const addMarker = (
       image: new Icon({
         anchor: [0.5, 1],
         src: 'https://cdn-icons-png.flaticon.com/512/684/684908.png',
-        scale: 0.05,
+        scale: 0.09,
       }),
     })
   );
@@ -30,6 +30,7 @@ export const addMarker = (
   // Create new layer with this feature
   const markerSource = new VectorSource({ features: [markerFeature] });
   const markerLayer = new VectorLayer({ source: markerSource });
+  markerLayer.setZIndex(9999);
 
   // Remove old marker layer if it exists
   if (existingMarkerLayer) {
