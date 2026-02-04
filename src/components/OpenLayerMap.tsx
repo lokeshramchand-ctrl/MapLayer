@@ -13,16 +13,15 @@ import gsap from 'gsap';
 import { useNavigate } from 'react-router-dom';
 import { easeOut } from 'ol/easing';
 
-// --- THEME CONFIGURATION ---
 const themes = {
   dark: {
     bg: '#050505',
-    glass: 'rgba(20, 20, 20, 0.75)', // Slightly darker for better contrast
-    border: 'rgba(255, 255, 255, 0.15)', // Stronger border
+    glass: 'rgba(20, 20, 20, 0.75)',
+    border: 'rgba(255, 255, 255, 0.15)',
     textMain: '#ffffff',
     textMuted: '#AAAAAA',
     iconColor: '#ffffff',
-    shadow: '0 4px 20px rgba(0,0,0,0.4)', // Strong shadow
+    shadow: '0 4px 20px rgba(0,0,0,0.4)',
     switchTrackActive: 'rgba(255,255,255,0.2)',
     switchTrackInactive: 'rgba(255,255,255,0.05)',
     switchKnobActive: '#fff',
@@ -31,7 +30,7 @@ const themes = {
   },
   light: {
     bg: '#F4F4F5',
-    glass: 'rgba(255, 255, 255, 0.90)', // More opaque for visibility
+    glass: 'rgba(255, 255, 255, 0.90)',
     border: 'rgba(0, 0, 0, 0.1)',
     textMain: '#18181B',
     textMuted: '#52525B',
@@ -45,7 +44,6 @@ const themes = {
   }
 };
 
-// --- SCROLLBAR CSS ---
 const scrollbarStyles = `
   .custom-scrollbar::-webkit-scrollbar { width: 4px; }
   .custom-scrollbar::-webkit-scrollbar-track { background: rgba(128, 128, 128, 0.1); border-radius: 4px; }
@@ -53,7 +51,6 @@ const scrollbarStyles = `
   .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(128, 128, 128, 0.5); }
 `;
 
-// --- HELPER: Extract Color ---
 const extractColorFromStyle = (style: any): string => {
   let color: any = '#888888';
   if (style.getStroke() && style.getStroke().getColor()) color = style.getStroke().getColor();
@@ -75,7 +72,6 @@ interface MapViewProps {
 const MapView: React.FC<MapViewProps> = ({ initialAddressData, initialTerm }) => {
   const navigate = useNavigate();
   
-  // -- STATE --
   const [isDarkMode, setIsDarkMode] = useState(true);
   const currentTheme = isDarkMode ? themes.dark : themes.light;
 
@@ -90,7 +86,6 @@ const MapView: React.FC<MapViewProps> = ({ initialAddressData, initialTerm }) =>
     size: { width: 0, height: 0 }
   });
 
-  // -- REFS --
   const mapDivRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<Map | null>(null);
   const tileLayerRef = useRef<TileLayer<XYZ> | null>(null);
@@ -100,10 +95,8 @@ const MapView: React.FC<MapViewProps> = ({ initialAddressData, initialTerm }) =>
   );
   const uiContainerRef = useRef<HTMLDivElement>(null);
 
-  // -- GSAP ENTRANCE --
   useLayoutEffect(() => {
     const ctx = gsap.context(() => {
-      // We use clearProps: 'all' to ensure GSAP doesn't leave the elements with weird opacity states
       gsap.from('.floating-ui', {
         y: 20, 
         opacity: 0, 
@@ -111,13 +104,12 @@ const MapView: React.FC<MapViewProps> = ({ initialAddressData, initialTerm }) =>
         stagger: 0.1, 
         ease: 'power3.out', 
         delay: 0.5,
-        clearProps: 'opacity,transform' // Crucial: Ensures visibility after animation ends
+        clearProps: 'opacity,transform'
       });
     }, uiContainerRef);
     return () => ctx.revert();
   }, []);
 
-  // -- MAP INIT --
   useEffect(() => {
     if (!mapRef.current) {
       const baseLayer = new TileLayer({
@@ -154,7 +146,6 @@ const MapView: React.FC<MapViewProps> = ({ initialAddressData, initialTerm }) =>
     }
   }, []);
 
-  // -- THEME SWITCHING --
   useEffect(() => {
     if (mapRef.current && tileLayerRef.current) {
         tileLayerRef.current.setSource(new XYZ({
@@ -164,7 +155,6 @@ const MapView: React.FC<MapViewProps> = ({ initialAddressData, initialTerm }) =>
     }
   }, [isDarkMode]);
 
-  // -- SEARCH DATA --
   useEffect(() => {
     if (initialAddressData && initialAddressData.length > 0) {
       const lat = parseFloat(initialAddressData[0].lat);
@@ -196,7 +186,6 @@ const MapView: React.FC<MapViewProps> = ({ initialAddressData, initialTerm }) =>
   const clickedLonLat = clickedCoordinate ? toLonLat(clickedCoordinate) : null;
   const activeLayerCount = Object.values(layerVisibility).filter(Boolean).length;
 
-  // -- STYLES --
   const styles = {
     wrapper: {
       position: 'relative' as const, width: '100vw', height: '100vh',
@@ -207,7 +196,7 @@ const MapView: React.FC<MapViewProps> = ({ initialAddressData, initialTerm }) =>
     uiLayer: {
       position: 'absolute' as const, top: 0, left: 0, width: '100%', height: '100%',
       pointerEvents: 'none' as const, 
-      zIndex: 1000, // FORCE TOP LAYER
+      zIndex: 1000,
       padding: '24px',
       display: 'flex', flexDirection: 'column' as const, justifyContent: 'space-between',
     },
@@ -216,7 +205,7 @@ const MapView: React.FC<MapViewProps> = ({ initialAddressData, initialTerm }) =>
         alignItems: 'center', 
         pointerEvents: 'auto' as const,
         gap: '12px',
-        width: '100%' // Ensure it spans width
+        width: '100%'
     },
     glassPanel: {
         background: currentTheme.glass,
@@ -232,7 +221,7 @@ const MapView: React.FC<MapViewProps> = ({ initialAddressData, initialTerm }) =>
         backdropFilter: 'blur(20px)', border: `1px solid ${currentTheme.border}`,
         boxShadow: currentTheme.shadow,
         transition: 'all 0.3s ease',
-        flexShrink: 0 // Prevent collapsing
+        flexShrink: 0
     },
     actionButton: {
       width: '48px', height: '48px', borderRadius: '50%',
@@ -240,10 +229,10 @@ const MapView: React.FC<MapViewProps> = ({ initialAddressData, initialTerm }) =>
       background: currentTheme.glass, 
       backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
       border: `1px solid ${currentTheme.border}`, 
-      color: currentTheme.iconColor, // Explicit high contrast color
-      boxShadow: currentTheme.shadow, // Force visibility
+      color: currentTheme.iconColor,
+      boxShadow: currentTheme.shadow,
       cursor: 'pointer', transition: 'all 0.2s',
-      flexShrink: 0 // Prevent collapsing
+      flexShrink: 0
     },
     controlsContainer: {
       marginTop: 'auto', maxWidth: '340px', maxHeight: '60vh',
@@ -346,19 +335,15 @@ const MapView: React.FC<MapViewProps> = ({ initialAddressData, initialTerm }) =>
     <div style={styles.wrapper}>
       <style>{scrollbarStyles}</style>
 
-      {/* 1. MAP LAYER */}
       <div 
         ref={mapDivRef} 
         style={{ width: '100%', height: '100%', transition: 'filter 0.5s' }} 
       />
 
-      {/* 2. UI LAYER */}
       <div ref={uiContainerRef} style={styles.uiLayer}>
         
-        {/* TOP BAR */}
         <div style={styles.topBar}>
             
-            {/* Back Button */}
             <button 
                 className="floating-ui"
                 style={styles.actionButton}
@@ -370,7 +355,6 @@ const MapView: React.FC<MapViewProps> = ({ initialAddressData, initialTerm }) =>
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
             </button>
 
-            {/* Location Badge */}
             <div className="floating-ui" style={styles.locationBadge}>
                 <div style={{ width: '6px', height: '6px', background: '#00FF94', borderRadius: '50%', marginRight: '12px', boxShadow: '0 0 8px #00FF94' }} />
                 <span style={{ fontSize: '14px', fontWeight: 600, letterSpacing: '0.5px', color: currentTheme.textMain, textTransform: 'uppercase' }}>
@@ -378,7 +362,6 @@ const MapView: React.FC<MapViewProps> = ({ initialAddressData, initialTerm }) =>
                 </span>
             </div>
 
-            {/* Theme Toggle Button */}
             <button 
                 className="floating-ui"
                 style={styles.actionButton}
@@ -396,7 +379,6 @@ const MapView: React.FC<MapViewProps> = ({ initialAddressData, initialTerm }) =>
 
         </div>
 
-        {/* CONTROLS */}
         <div className="floating-ui" style={styles.controlsContainer}>
             <div style={styles.controlsHeader}>Overlay Controls</div>
             
@@ -428,14 +410,12 @@ const MapView: React.FC<MapViewProps> = ({ initialAddressData, initialTerm }) =>
             </div>
         </div>
 
-        {/* HUD */}
         {clickedCoordinate && (
             <div className="floating-ui" style={styles.hud}>
                 LOCATION_LOCK: {clickedCoordinate[1].toFixed(4)} N, {clickedCoordinate[0].toFixed(4)} E
             </div>
         )}
 
-        {/* RIGHT SIDEBAR */}
         <div className="floating-ui" style={styles.rightSidebar}>
           <div style={styles.sidebarCard}>
             <div style={styles.sidebarTitle}>General Values</div>
