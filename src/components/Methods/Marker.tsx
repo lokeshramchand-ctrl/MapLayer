@@ -1,4 +1,3 @@
-// src/Methods/addMarker.ts
 
 import Feature from 'ol/Feature';
 import Point from 'ol/geom/Point';
@@ -9,16 +8,11 @@ import Icon from 'ol/style/Icon';
 import { Map } from 'ol';
 import { Coordinate } from 'ol/coordinate';
 
-/**
- * Adds a custom icon marker to the map at a given coordinate,
- * replacing the previous marker layer if one exists.
- */
 export const addMarker = (
   coords: Coordinate,
   map: Map,
   existingMarkerLayer: VectorLayer | null
 ): VectorLayer => {
-  // Create feature for the marker
   const markerFeature = new Feature({
     geometry: new Point(coords),
   });
