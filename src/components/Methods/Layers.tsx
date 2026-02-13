@@ -19,8 +19,8 @@ const baseConfigs: Omit<LayerConfig, 'getUrl'>[] = [
     radius: 1,
     topic: 'Parcels',
     style: new Style({
-      stroke: new Stroke({ color: '#00D9FF', width: 5.5 }),
-      fill: new Fill({ color: 'rgba(0, 217, 255, 0.1)' }),
+      stroke: new Stroke({ color: '#00FF00', width: 8 }),
+      fill: new Fill({ color: 'rgba(0, 255, 0, 0.25)' }),
     }),
   },
   {

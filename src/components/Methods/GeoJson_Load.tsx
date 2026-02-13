@@ -10,7 +10,8 @@ export const loadAndRenderGeoJsonLayer = async (
   url: string,
   map: Map,
   layerRef: React.MutableRefObject<VectorLayer | null>,
-  style: Style
+  style: Style,
+  topic?: string
 ) => {
   try {
     const res = await fetch(url);
@@ -31,6 +32,11 @@ export const loadAndRenderGeoJsonLayer = async (
       source: vectorSource,
       style: style,
     });
+
+    // Ensure Parcels layer (plot area) is always on top
+    if (topic === 'Parcels') {
+      vectorLayer.setZIndex(10000);
+    }
 
     map.addLayer(vectorLayer);
     layerRef.current = vectorLayer;
