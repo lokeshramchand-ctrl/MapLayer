@@ -165,7 +165,7 @@ const MapView: React.FC<MapViewProps> = ({ initialAddressData, initialTerm }) =>
         if(layerRefs.current[layerConfig.topic].current) mapRef.current!.removeLayer(layerRefs.current[layerConfig.topic].current!);
         const url = layerConfig.getUrl(lon, lat, layerConfig.radius);
         const ref = layerRefs.current[layerConfig.topic];
-        loadAndRenderGeoJsonLayer(url, mapRef.current!, ref, layerConfig.style, layerConfig.topic);
+        loadAndRenderGeoJsonLayer(url, mapRef.current!, ref, layerConfig.style);
       });
     }
   }, [initialAddressData]);
