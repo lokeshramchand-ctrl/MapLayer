@@ -158,7 +158,7 @@ const MapView: React.FC<MapViewProps> = ({ initialAddressData, initialTerm }) =>
       const lon = parseFloat(initialAddressData[0].lon);
       const coords = fromLonLat([lon, lat]);
 
-      mapRef.current!.getView().animate({ center: coords, zoom: 14, duration: 2500, easing: easeOut });
+      mapRef.current!.getView().animate({ center: coords, zoom: 20, duration: 2500, easing: easeOut });
       markerLayerRef.current = addMarker(coords, mapRef.current!, markerLayerRef.current);
       
       layerConfigs.forEach((layerConfig) => {
