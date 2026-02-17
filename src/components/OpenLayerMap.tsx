@@ -49,6 +49,18 @@ const scrollbarStyles = `
   .custom-scrollbar::-webkit-scrollbar-track { background: rgba(128, 128, 128, 0.1); border-radius: 4px; }
   .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(128, 128, 128, 0.3); border-radius: 4px; }
   .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(128, 128, 128, 0.5); }
+  
+  .location-badge {
+    max-width: clamp(100px, 35vw, 350px);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: clamp(11px, 2.5vw, 14px);
+  }
+  
+  .floating-ui {
+    padding: clamp(12px, 2vw, 24px);
+  }
 `;
 
 const extractColorFromStyle = (style: any): string => {
@@ -196,34 +208,37 @@ const MapView: React.FC<MapViewProps> = ({ initialAddressData, initialTerm }) =>
       position: 'absolute' as const, top: 0, left: 0, width: '100%', height: '100%',
       pointerEvents: 'none' as const, 
       zIndex: 1000,
-      padding: '24px',
+      padding: 'clamp(16px, 3vw, 24px)',
       display: 'flex', flexDirection: 'column' as const, justifyContent: 'space-between',
     },
     topBar: { 
         display: 'flex', 
         alignItems: 'center', 
         pointerEvents: 'auto' as const,
-        gap: '12px',
-        width: '100%'
+        gap: 'clamp(8px, 2vw, 16px)',
+        width: '100%',
+        justifyContent: 'space-between',
+        flexWrap: 'wrap' as const
     },
     glassPanel: {
         background: currentTheme.glass,
         backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
         border: `1px solid ${currentTheme.border}`,
-        borderRadius: '20px', padding: '40px',
+        borderRadius: '20px', padding: 'clamp(24px, 5vw, 40px)',
         boxShadow: currentTheme.shadow,
         transition: 'all 0.3s ease'
     },
     locationBadge: {
-        display: 'flex', alignItems: 'center', padding: '12px 24px',
+        display: 'flex', alignItems: 'center', padding: 'clamp(8px, 2vw, 12px) clamp(16px, 3vw, 24px)',
         borderRadius: '30px', background: currentTheme.glass,
         backdropFilter: 'blur(20px)', border: `1px solid ${currentTheme.border}`,
         boxShadow: currentTheme.shadow,
         transition: 'all 0.3s ease',
-        flexShrink: 0
+        flexShrink: 1,
+        minWidth: 0
     },
     actionButton: {
-      width: '48px', height: '48px', borderRadius: '50%',
+      width: 'clamp(40px, 10vw, 48px)', height: 'clamp(40px, 10vw, 48px)', borderRadius: '50%',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
       background: currentTheme.glass, 
       backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
@@ -234,10 +249,10 @@ const MapView: React.FC<MapViewProps> = ({ initialAddressData, initialTerm }) =>
       flexShrink: 0
     },
     controlsContainer: {
-      marginTop: 'auto', maxWidth: '340px', maxHeight: '60vh',
+      marginTop: 'auto', maxWidth: 'clamp(280px, 40vw, 380px)', maxHeight: '60vh',
       display: 'flex', flexDirection: 'column' as const, pointerEvents: 'auto' as const,
       background: currentTheme.glass, backdropFilter: 'blur(20px)',
-      border: `1px solid ${currentTheme.border}`, borderRadius: '10px', padding: '20px',
+      border: `1px solid ${currentTheme.border}`, borderRadius: '10px', padding: 'clamp(12px, 3vw, 20px)',
       boxShadow: currentTheme.shadow, transition: 'all 0.3s ease',
       position: 'relative' as const,
       transform: showLeftSidebar ? 'translateX(0)' : 'translateX(calc(-100% - 32px))',
@@ -245,33 +260,33 @@ const MapView: React.FC<MapViewProps> = ({ initialAddressData, initialTerm }) =>
       visibility: showLeftSidebar ? 'visible' as const : 'hidden' as const,
     },
     controlsHeader: {
-        flexShrink: 0, fontSize: '10px', fontWeight: 700, letterSpacing: '1px',
-        color: currentTheme.textMuted, marginBottom: '16px', textTransform: 'uppercase' as const,
-        borderBottom: `1px solid ${currentTheme.border}`, paddingBottom: '12px'
+        flexShrink: 0, fontSize: 'clamp(9px, 1.5vw, 10px)', fontWeight: 700, letterSpacing: '1px',
+        color: currentTheme.textMuted, marginBottom: 'clamp(12px, 2vw, 16px)', textTransform: 'uppercase' as const,
+        borderBottom: `1px solid ${currentTheme.border}`, paddingBottom: 'clamp(8px, 1.5vw, 12px)'
     },
-    scrollableList: { overflowY: 'auto' as const, paddingRight: '8px' },
-    layerRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', cursor: 'pointer', padding: '4px 8px' },
-    layerLabel: { display: 'flex', alignItems: 'center', gap: '12px' },
+    scrollableList: { overflowY: 'auto' as const, paddingRight: 'clamp(4px, 1vw, 8px)' },
+    layerRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'clamp(8px, 2vw, 12px)', cursor: 'pointer', padding: 'clamp(2px, 1vw, 4px) clamp(4px, 1.5vw, 8px)' },
+    layerLabel: { display: 'flex', alignItems: 'center', gap: 'clamp(8px, 2vw, 12px)' },
     switchTrack: { width: '32px', height: '18px', borderRadius: '10px', position: 'relative' as const, transition: 'background 0.3s ease' },
     switchKnob: { width: '14px', height: '14px', borderRadius: '50%', position: 'absolute' as const, top: '2px', transition: 'left 0.3s cubic-bezier(0.4, 0.0, 0.2, 1)', boxShadow: '0 2px 4px rgba(0,0,0,0.2)' },
     hud: {
-        position: 'absolute' as const, bottom: '24px', right: '24px',
-        fontFamily: '"JetBrains Mono", monospace', fontSize: '10px',
+        position: 'absolute' as const, bottom: 'clamp(16px, 3vw, 24px)', right: 'clamp(16px, 3vw, 24px)',
+        fontFamily: '"JetBrains Mono", monospace', fontSize: 'clamp(9px, 1.5vw, 10px)',
         color: currentTheme.textMuted, pointerEvents: 'auto' as const,
-        padding: '8px 12px', background: currentTheme.glass,
+        padding: 'clamp(6px, 1.5vw, 8px) clamp(10px, 2vw, 12px)', background: currentTheme.glass,
         borderRadius: '8px', border: `1px solid ${currentTheme.border}`,
         boxShadow: currentTheme.shadow,
         transition: 'background 0.3s, color 0.3s'
     },
     rightSidebar: {
       position: 'absolute' as const,
-      top: '92px',
-      right: '24px',
-      width: '320px',
+      top: 'clamp(80px, 10vw, 92px)',
+      right: 'clamp(16px, 3vw, 24px)',
+      width: 'clamp(260px, 35vw, 380px)',
       maxHeight: 'calc(100% - 140px)',
       display: 'flex',
       flexDirection: 'column' as const,
-      gap: '12px',
+      gap: 'clamp(8px, 2vw, 12px)',
       pointerEvents: 'auto' as const,
       zIndex: 1100,
       transform: showRightSidebar ? 'translateX(0)' : 'translateX(calc(100% + 32px))',
@@ -285,31 +300,31 @@ const MapView: React.FC<MapViewProps> = ({ initialAddressData, initialTerm }) =>
       WebkitBackdropFilter: 'blur(20px)',
       border: `1px solid ${currentTheme.border}`,
       borderRadius: '16px',
-      padding: '16px',
+      padding: 'clamp(12px, 2.5vw, 16px)',
       boxShadow: currentTheme.shadow,
       transition: 'all 0.3s ease'
     },
     sidebarTitle: {
-      fontSize: '11px',
+      fontSize: 'clamp(9px, 1.5vw, 11px)',
       fontWeight: 700,
       letterSpacing: '1px',
       color: currentTheme.textMuted,
       textTransform: 'uppercase' as const,
-      marginBottom: '12px'
+      marginBottom: 'clamp(8px, 2vw, 12px)'
     },
     statRow: {
       display: 'flex',
       justifyContent: 'space-between',
       alignItems: 'center',
-      padding: '6px 0',
+      padding: 'clamp(4px, 1vw, 6px) 0',
       borderBottom: `1px dashed ${currentTheme.border}`
     },
     statLabel: {
-      fontSize: '12px',
+      fontSize: 'clamp(11px, 1.8vw, 12px)',
       color: currentTheme.textMuted
     },
     statValue: {
-      fontSize: '12px',
+      fontSize: 'clamp(11px, 1.8vw, 12px)',
       fontWeight: 600,
       color: currentTheme.textMain
     },
@@ -317,21 +332,21 @@ const MapView: React.FC<MapViewProps> = ({ initialAddressData, initialTerm }) =>
       display: 'flex',
       justifyContent: 'space-between',
       alignItems: 'center',
-      gap: '12px',
-      padding: '8px 0',
+      gap: 'clamp(8px, 2vw, 12px)',
+      padding: 'clamp(6px, 1.5vw, 8px) 0',
       borderBottom: `1px dashed ${currentTheme.border}`
     },
     layerMetaName: {
-      fontSize: '12px',
+      fontSize: 'clamp(11px, 1.8vw, 12px)',
       color: currentTheme.textMain,
       display: 'flex',
       alignItems: 'center',
-      gap: '8px'
+      gap: 'clamp(6px, 1.5vw, 8px)'
     },
     layerMetaBadge: {
-      fontSize: '10px',
+      fontSize: 'clamp(9px, 1.5vw, 10px)',
       fontWeight: 600,
-      padding: '2px 8px',
+      padding: 'clamp(1px, 0.5vw, 2px) clamp(6px, 1.5vw, 8px)',
       borderRadius: '999px',
       border: `1px solid ${currentTheme.border}`,
       color: currentTheme.textMuted
