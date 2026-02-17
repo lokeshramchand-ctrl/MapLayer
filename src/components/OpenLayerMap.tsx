@@ -76,6 +76,8 @@ const MapView: React.FC<MapViewProps> = ({ initialAddressData, initialTerm }) =>
     Object.fromEntries(layerConfigs.map(layer => [layer.topic, true]))
   );
   const [clickedCoordinate, setClickedCoordinate] = useState<Coordinate>();
+  const [showLeftSidebar, setShowLeftSidebar] = useState(true);
+  const [showRightSidebar, setShowRightSidebar] = useState(true);
   const [mapStats, setMapStats] = useState({
     zoom: 2,
     center: [0, 0] as Coordinate,
@@ -236,7 +238,11 @@ const MapView: React.FC<MapViewProps> = ({ initialAddressData, initialTerm }) =>
       display: 'flex', flexDirection: 'column' as const, pointerEvents: 'auto' as const,
       background: currentTheme.glass, backdropFilter: 'blur(20px)',
       border: `1px solid ${currentTheme.border}`, borderRadius: '10px', padding: '20px',
-      boxShadow: currentTheme.shadow, transition: 'all 0.3s ease'
+      boxShadow: currentTheme.shadow, transition: 'all 0.3s ease',
+      position: 'relative' as const,
+      transform: showLeftSidebar ? 'translateX(0)' : 'translateX(calc(-100% - 32px))',
+      opacity: showLeftSidebar ? 1 : 0,
+      visibility: showLeftSidebar ? 'visible' as const : 'hidden' as const,
     },
     controlsHeader: {
         flexShrink: 0, fontSize: '10px', fontWeight: 700, letterSpacing: '1px',
@@ -267,7 +273,11 @@ const MapView: React.FC<MapViewProps> = ({ initialAddressData, initialTerm }) =>
       flexDirection: 'column' as const,
       gap: '12px',
       pointerEvents: 'auto' as const,
-      zIndex: 1100
+      zIndex: 1100,
+      transform: showRightSidebar ? 'translateX(0)' : 'translateX(calc(100% + 32px))',
+      opacity: showRightSidebar ? 1 : 0,
+      visibility: showRightSidebar ? 'visible' as const : 'hidden' as const,
+      transition: 'all 0.3s ease'
     },
     sidebarCard: {
       background: currentTheme.glass,
@@ -352,6 +362,23 @@ const MapView: React.FC<MapViewProps> = ({ initialAddressData, initialTerm }) =>
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
             </button>
 
+            <button 
+                className="floating-ui"
+                style={styles.actionButton}
+                onClick={() => setShowLeftSidebar(!showLeftSidebar)}
+                title={showLeftSidebar ? "Hide Left Sidebar" : "Show Left Sidebar"}
+                onMouseEnter={(e) => e.currentTarget.style.borderColor = isDarkMode ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.4)'}
+                onMouseLeave={(e) => e.currentTarget.style.borderColor = currentTheme.border}
+            >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    {showLeftSidebar ? (
+                        <path d="M15 19H9a6 6 0 0 1-6-6V11a6 6 0 0 1 6-6h6M10 5v14"/>
+                    ) : (
+                        <path d="M9 19h6a6 6 0 0 0 6-6V11a6 6 0 0 0-6-6H9M14 5v14"/>
+                    )}
+                </svg>
+            </button>
+
             <div className="floating-ui" style={styles.locationBadge}>
                 <div style={{ width: '6px', height: '6px', background: '#00FF94', borderRadius: '50%', marginRight: '12px', boxShadow: '0 0 8px #00FF94' }} />
                 <span style={{ fontSize: '14px', fontWeight: 600, letterSpacing: '0.5px', color: currentTheme.textMain, textTransform: 'uppercase' }}>
@@ -372,6 +399,23 @@ const MapView: React.FC<MapViewProps> = ({ initialAddressData, initialTerm }) =>
                ) : (
                     <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
                )}
+            </button>
+
+            <button 
+                className="floating-ui"
+                style={styles.actionButton}
+                onClick={() => setShowRightSidebar(!showRightSidebar)}
+                title={showRightSidebar ? "Hide Right Sidebar" : "Show Right Sidebar"}
+                onMouseEnter={(e) => e.currentTarget.style.borderColor = isDarkMode ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.4)'}
+                onMouseLeave={(e) => e.currentTarget.style.borderColor = currentTheme.border}
+            >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    {showRightSidebar ? (
+                        <path d="M9 19h6a6 6 0 0 0 6-6V11a6 6 0 0 0-6-6H9M14 5v14"/>
+                    ) : (
+                        <path d="M15 19H9a6 6 0 0 1-6-6V11a6 6 0 0 1 6-6h6M10 5v14"/>
+                    )}
+                </svg>
             </button>
 
         </div>
