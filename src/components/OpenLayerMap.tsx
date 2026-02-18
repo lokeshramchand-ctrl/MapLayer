@@ -12,6 +12,7 @@ import { addMarker } from './Methods/Marker';
 import gsap from 'gsap';
 import { useNavigate } from 'react-router-dom';
 import { easeOut } from 'ol/easing';
+import { ArrowLeft, PanelLeft, PanelRight, Sun, Moon, PanelLeftClose, PanelRightClose } from 'lucide-react';
 
 const themes = {
   dark: {
@@ -184,6 +185,12 @@ const MapView: React.FC<MapViewProps> = ({ initialAddressData, initialTerm }) =>
   const centerLonLat = toLonLat(mapStats.center);
   const clickedLonLat = clickedCoordinate ? toLonLat(clickedCoordinate) : null;
   const activeLayerCount = Object.values(layerVisibility).filter(Boolean).length;
+  const iconProps = {
+    size: 20,
+    color: currentTheme.iconColor,
+    stroke: currentTheme.iconColor,
+    strokeWidth: 2.2
+  };
 
   const styles = {
     wrapper: {
@@ -359,7 +366,7 @@ const MapView: React.FC<MapViewProps> = ({ initialAddressData, initialTerm }) =>
                 onMouseEnter={(e) => e.currentTarget.style.borderColor = isDarkMode ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.4)'}
                 onMouseLeave={(e) => e.currentTarget.style.borderColor = currentTheme.border}
             >
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+              <ArrowLeft {...iconProps} />
             </button>
 
             <button 
@@ -370,13 +377,7 @@ const MapView: React.FC<MapViewProps> = ({ initialAddressData, initialTerm }) =>
                 onMouseEnter={(e) => e.currentTarget.style.borderColor = isDarkMode ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.4)'}
                 onMouseLeave={(e) => e.currentTarget.style.borderColor = currentTheme.border}
             >
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    {showLeftSidebar ? (
-                        <path d="M15 19H9a6 6 0 0 1-6-6V11a6 6 0 0 1 6-6h6M10 5v14"/>
-                    ) : (
-                        <path d="M9 19h6a6 6 0 0 0 6-6V11a6 6 0 0 0-6-6H9M14 5v14"/>
-                    )}
-                </svg>
+              {showLeftSidebar ? <PanelLeftClose {...iconProps} /> : <PanelLeft {...iconProps} />}
             </button>
 
             <div className="floating-ui" style={styles.locationBadge}>
@@ -394,11 +395,7 @@ const MapView: React.FC<MapViewProps> = ({ initialAddressData, initialTerm }) =>
                 onMouseEnter={(e) => e.currentTarget.style.borderColor = isDarkMode ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.4)'}
                 onMouseLeave={(e) => e.currentTarget.style.borderColor = currentTheme.border}
             >
-               {isDarkMode ? (
-                    <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
-               ) : (
-                    <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
-               )}
+                {isDarkMode ? <Sun {...iconProps} /> : <Moon {...iconProps} />}
             </button>
 
             <button 
@@ -409,13 +406,7 @@ const MapView: React.FC<MapViewProps> = ({ initialAddressData, initialTerm }) =>
                 onMouseEnter={(e) => e.currentTarget.style.borderColor = isDarkMode ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.4)'}
                 onMouseLeave={(e) => e.currentTarget.style.borderColor = currentTheme.border}
             >
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    {showRightSidebar ? (
-                        <path d="M9 19h6a6 6 0 0 0 6-6V11a6 6 0 0 0-6-6H9M14 5v14"/>
-                    ) : (
-                        <path d="M15 19H9a6 6 0 0 1-6-6V11a6 6 0 0 1 6-6h6M10 5v14"/>
-                    )}
-                </svg>
+              {showRightSidebar ? <PanelRightClose {...iconProps} /> : <PanelRight {...iconProps} />}
             </button>
 
         </div>
