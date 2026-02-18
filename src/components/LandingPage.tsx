@@ -13,7 +13,6 @@ const LandingPage: React.FC<LandingPageProps> = ({ onSearchSuccess }) => {
   const [isFocused, setIsFocused] = useState(false);
   const navigate = useNavigate();
 
-  // --- REFS ---
   const containerRef = useRef<HTMLDivElement>(null);
   const glowRef = useRef<HTMLDivElement>(null);
   const titleRef = useRef<HTMLHeadingElement>(null);
