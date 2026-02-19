@@ -233,6 +233,9 @@ const LandingPage: React.FC<LandingPageProps> = ({ onSearchSuccess }) => {
       <style>{`
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
         ::selection { background: rgba(255,255,255,0.2); color: white; }
+        @media (max-width: 768px) {
+          .description-text { display: none; }
+        }
       `}</style>
 
       {/* Ambient Background Aura */}
@@ -288,7 +291,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onSearchSuccess }) => {
             </button>
           </div>
         </form>
-        <h3 ref={titleRef} style={styles.texting}>
+        <h3 ref={titleRef} style={styles.texting} className="description-text">
           MapLayer is a lightweight and powerful geospatial visualization platform designed to make mapping simple and intuitive. It allows users to load, explore, and interact with GeoJSON datasets directly in the browser using a modern React interface. With customizable layers, markers, and seamless OpenLayers integration, MapLayer transforms raw geographic data into meaningful insights. Built for developers, researchers, and analysts, it delivers speed, flexibility, and a clean mapping experience.
         </h3>
       </div>
