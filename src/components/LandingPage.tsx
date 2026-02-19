@@ -11,6 +11,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onSearchSuccess }) => {
   const [term, setTerm] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
   const navigate = useNavigate();
 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -71,17 +72,27 @@ const LandingPage: React.FC<LandingPageProps> = ({ onSearchSuccess }) => {
 
 
   // --- LOGIC ---
+  const isCompleteAddress = (address: any) => {
+    if (!address) return false;
+    const hasStreet = Boolean(address.house_number && address.road);
+    const hasCity = Boolean(address.city || address.town || address.village);
+    const hasState = Boolean(address.state || address.state_code);
+    return hasStreet && hasCity && hasState;
+  };
+
+  const isSanDiegoAddress = (address: any) => {
+    if (!address) return false;
+    const city = (address.city || address.town || address.village || '').toLowerCase();
+    const county = (address.county || '').toLowerCase();
+    return city.includes('san diego') || city.includes('san deigo') || county.includes('san diego');
+  };
+
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!term) return;
+    setErrorMessage('');
 
     setIsLoading(true);
-
-    // Cinematic Exit Animation
-    const tl = gsap.timeline();
-    tl.to(titleRef.current, { opacity: 0, y: -20, duration: 0.5 })
-      .to(formRef.current, { scale: 0.9, opacity: 0, blur: 10, duration: 0.4 }, '-=0.3')
-      .to(glowRef.current, { scale: 3, opacity: 0, duration: 0.8 }, '-=0.4');
 
     try {
       const response = await fetch(`https://nominatim.openstreetmap.org/search
@@ -95,15 +106,33 @@ const LandingPage: React.FC<LandingPageProps> = ({ onSearchSuccess }) => {
 `);
       const json = await response.json();
 
+      const validResults = Array.isArray(json)
+        ? json.filter((item) => isCompleteAddress(item.address) && isSanDiegoAddress(item.address))
+        : [];
+
+      if (validResults.length === 0) {
+        setIsLoading(false);
+        setErrorMessage('San Diego address only. Please try a different query.');
+        gsap.to([containerRef.current, titleRef.current, formRef.current], { opacity: 1, y: 0, scale: 1, blur: 0, duration: 0.5 });
+        return;
+      }
+
+      // Cinematic Exit Animation
+      const tl = gsap.timeline();
+      tl.to(titleRef.current, { opacity: 0, y: -20, duration: 0.5 })
+        .to(formRef.current, { scale: 0.9, opacity: 0, blur: 10, duration: 0.4 }, '-=0.3')
+        .to(glowRef.current, { scale: 3, opacity: 0, duration: 0.8 }, '-=0.4');
+
       // Artificial delay for smooth transition feel
       setTimeout(() => {
-        onSearchSuccess(json, term);
+        onSearchSuccess(validResults, term);
         navigate('/open');
       }, 800);
 
     } catch (error) {
       console.error("Search failed", error);
       setIsLoading(false);
+      setErrorMessage('Search failed. Please try again.');
       // Reset Animation if failed
       gsap.to([containerRef.current, titleRef.current, formRef.current], { opacity: 1, y: 0, scale: 1, blur: 0, duration: 0.5 });
     }
@@ -165,7 +194,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onSearchSuccess }) => {
       background: 'rgba(255, 255, 255, 0.03)', // Extremely subtle fill
       backdropFilter: 'blur(20px)', // Heavy blur
       WebkitBackdropFilter: 'blur(20px)',
-      border: '1px solid rgba(255, 255, 255, 0.08)',
+      border: errorMessage ? '1px solid rgba(255, 80, 80, 0.6)' : '1px solid rgba(255, 255, 255, 0.08)',
       borderRadius: '24px', // Smooth pill shape
       padding: '8px',
       transition: 'border-color 0.3s ease, box-shadow 0.3s ease',
@@ -212,6 +241,14 @@ const LandingPage: React.FC<LandingPageProps> = ({ onSearchSuccess }) => {
       borderTop: '2px solid #000',
       borderRadius: '50%',
       animation: 'spin 1s linear infinite',
+    },
+    alert: {
+      marginTop: '14px',
+      color: '#ff5a5a',
+      fontSize: '0.95rem',
+      fontWeight: 600,
+      letterSpacing: '-0.01em',
+      textAlign: 'center' as const,
     },
     texting: {
       fontSize: 'clamp(1rem, 6vw, 1rem)',
@@ -264,7 +301,10 @@ const LandingPage: React.FC<LandingPageProps> = ({ onSearchSuccess }) => {
               ref={inputRef}
               type="text"
               value={term}
-              onChange={(e) => setTerm(e.target.value)}
+              onChange={(e) => {
+                setTerm(e.target.value);
+                if (errorMessage) setErrorMessage('');
+              }}
               onFocus={() => setIsFocused(true)}
               onBlur={() => setIsFocused(false)}
               placeholder="Search address, city, or place..."
@@ -290,6 +330,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onSearchSuccess }) => {
               )}
             </button>
           </div>
+          {errorMessage && <div style={styles.alert}>{errorMessage}</div>}
         </form>
         <h3 ref={titleRef} style={styles.texting} className="description-text">
           MapLayer is a lightweight and powerful geospatial visualization platform designed to make mapping simple and intuitive. It allows users to load, explore, and interact with GeoJSON datasets directly in the browser using a modern React interface. With customizable layers, markers, and seamless OpenLayers integration, MapLayer transforms raw geographic data into meaningful insights. Built for developers, researchers, and analysts, it delivers speed, flexibility, and a clean mapping experience.
