@@ -11,6 +11,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onSearchSuccess }) => {
   const [term, setTerm] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
   const navigate = useNavigate();
 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -26,24 +27,24 @@ const LandingPage: React.FC<LandingPageProps> = ({ onSearchSuccess }) => {
       const tl = gsap.timeline({ defaults: { ease: 'expo.out' } });
 
       // 1. Background Glow expands
-      tl.fromTo(glowRef.current, 
+      tl.fromTo(glowRef.current,
         { scale: 0.5, opacity: 0 },
         { scale: 1, opacity: 0.6, duration: 2, ease: 'power3.out' }
       )
-      // 2. Title floats up
-      .from(titleRef.current, {
-        y: 40,
-        opacity: 0,
-        duration: 1.5,
-        filter: 'blur(10px)', // Cinematic blur in
-      }, '-=1.5')
-      // 3. Search Bar expands width-wise
-      .from(formRef.current, {
-        scaleX: 0.8,
-        y: 20,
-        opacity: 0,
-        duration: 1.2,
-      }, '-=1.2');
+        // 2. Title floats up
+        .from(titleRef.current, {
+          y: 40,
+          opacity: 0,
+          duration: 1.5,
+          filter: 'blur(10px)', // Cinematic blur in
+        }, '-=1.5')
+        // 3. Search Bar expands width-wise
+        .from(formRef.current, {
+          scaleX: 0.8,
+          y: 20,
+          opacity: 0,
+          duration: 1.2,
+        }, '-=1.2');
 
     }, containerRef);
 
@@ -62,40 +63,76 @@ const LandingPage: React.FC<LandingPageProps> = ({ onSearchSuccess }) => {
 
   // Animate Glow on Focus
   useLayoutEffect(() => {
-    gsap.to(glowRef.current, { 
-      opacity: isFocused ? 0.8 : 0.4, 
+    gsap.to(glowRef.current, {
+      opacity: isFocused ? 0.8 : 0.4,
       scale: isFocused ? 1.1 : 1,
-      duration: 0.5 
+      duration: 0.5
     });
   }, [isFocused]);
 
 
   // --- LOGIC ---
+  const isCompleteAddress = (address: any) => {
+    if (!address) return false;
+    const hasStreet = Boolean(address.house_number && address.road);
+    const hasCity = Boolean(address.city || address.town || address.village);
+    const hasState = Boolean(address.state || address.state_code);
+    return hasStreet && hasCity && hasState;
+  };
+
+  const isSanDiegoAddress = (address: any) => {
+    if (!address) return false;
+    const city = (address.city || address.town || address.village || '').toLowerCase();
+    const county = (address.county || '').toLowerCase();
+    return city.includes('san diego') || city.includes('san deigo') || county.includes('san diego');
+  };
+
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!term) return;
+    setErrorMessage('');
 
     setIsLoading(true);
 
-    // Cinematic Exit Animation
-    const tl = gsap.timeline();
-    tl.to(titleRef.current, { opacity: 0, y: -20, duration: 0.5 })
-      .to(formRef.current, { scale: 0.9, opacity: 0, blur: 10, duration: 0.4 }, '-=0.3')
-      .to(glowRef.current, { scale: 3, opacity: 0, duration: 0.8 }, '-=0.4');
-
     try {
-      const response = await fetch(`https://nominatim.openstreetmap.org/search?q=${term}&format=json&polygon=1&addressdetails=1`);
+      const response = await fetch(`https://nominatim.openstreetmap.org/search
+?q=${term}
+&format=json
+&addressdetails=1
+&limit=5
+&countrycodes=us
+&viewbox=-124.48,42.01,-114.13,32.53
+&bounded=1
+`);
       const json = await response.json();
-      
+
+      const validResults = Array.isArray(json)
+        ? json.filter((item) => isCompleteAddress(item.address) && isSanDiegoAddress(item.address))
+        : [];
+
+      if (validResults.length === 0) {
+        setIsLoading(false);
+        setErrorMessage('San Diego address only. Please try a different query.');
+        gsap.to([containerRef.current, titleRef.current, formRef.current], { opacity: 1, y: 0, scale: 1, blur: 0, duration: 0.5 });
+        return;
+      }
+
+      // Cinematic Exit Animation
+      const tl = gsap.timeline();
+      tl.to(titleRef.current, { opacity: 0, y: -20, duration: 0.5 })
+        .to(formRef.current, { scale: 0.9, opacity: 0, blur: 10, duration: 0.4 }, '-=0.3')
+        .to(glowRef.current, { scale: 3, opacity: 0, duration: 0.8 }, '-=0.4');
+
       // Artificial delay for smooth transition feel
       setTimeout(() => {
-          onSearchSuccess(json, term);
-          navigate('/open');
+        onSearchSuccess(validResults, term);
+        navigate('/open');
       }, 800);
-      
+
     } catch (error) {
       console.error("Search failed", error);
       setIsLoading(false);
+      setErrorMessage('Search failed. Please try again.');
       // Reset Animation if failed
       gsap.to([containerRef.current, titleRef.current, formRef.current], { opacity: 1, y: 0, scale: 1, blur: 0, duration: 0.5 });
     }
@@ -157,12 +194,12 @@ const LandingPage: React.FC<LandingPageProps> = ({ onSearchSuccess }) => {
       background: 'rgba(255, 255, 255, 0.03)', // Extremely subtle fill
       backdropFilter: 'blur(20px)', // Heavy blur
       WebkitBackdropFilter: 'blur(20px)',
-      border: '1px solid rgba(255, 255, 255, 0.08)',
+      border: errorMessage ? '1px solid rgba(255, 80, 80, 0.6)' : '1px solid rgba(255, 255, 255, 0.08)',
       borderRadius: '24px', // Smooth pill shape
       padding: '8px',
       transition: 'border-color 0.3s ease, box-shadow 0.3s ease',
-      boxShadow: isFocused 
-        ? '0 0 40px rgba(255, 255, 255, 0.05), inset 0 0 0 1px rgba(255,255,255,0.1)' 
+      boxShadow: isFocused
+        ? '0 0 40px rgba(255, 255, 255, 0.05), inset 0 0 0 1px rgba(255,255,255,0.1)'
         : '0 10px 40px rgba(0,0,0,0.5)',
     },
     searchIcon: {
@@ -205,7 +242,15 @@ const LandingPage: React.FC<LandingPageProps> = ({ onSearchSuccess }) => {
       borderRadius: '50%',
       animation: 'spin 1s linear infinite',
     },
-        texting: {
+    alert: {
+      marginTop: '14px',
+      color: '#ff5a5a',
+      fontSize: '0.95rem',
+      fontWeight: 600,
+      letterSpacing: '-0.01em',
+      textAlign: 'center' as const,
+    },
+    texting: {
       fontSize: 'clamp(1rem, 6vw, 1rem)',
       fontWeight: 500,
       margin: '80px 240px 20px 240px',
@@ -220,11 +265,14 @@ const LandingPage: React.FC<LandingPageProps> = ({ onSearchSuccess }) => {
 
   return (
     <div ref={containerRef} style={styles.wrapper}>
-      
+
       {/* CSS Animation for loader */}
       <style>{`
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
         ::selection { background: rgba(255,255,255,0.2); color: white; }
+        @media (max-width: 768px) {
+          .description-text { display: none; }
+        }
       `}</style>
 
       {/* Ambient Background Aura */}
@@ -239,9 +287,9 @@ const LandingPage: React.FC<LandingPageProps> = ({ onSearchSuccess }) => {
         {/* Search Component */}
         <form ref={formRef} onSubmit={handleSearch} style={styles.form}>
           <div style={styles.glassContainer}>
-            
+
             {/* Search Icon */}
-            <div style={{...styles.searchIcon, color: isFocused ? '#fff' : '#555'}}>
+            <div style={{ ...styles.searchIcon, color: isFocused ? '#fff' : '#555' }}>
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                 <circle cx="11" cy="11" r="8"></circle>
                 <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
@@ -253,7 +301,10 @@ const LandingPage: React.FC<LandingPageProps> = ({ onSearchSuccess }) => {
               ref={inputRef}
               type="text"
               value={term}
-              onChange={(e) => setTerm(e.target.value)}
+              onChange={(e) => {
+                setTerm(e.target.value);
+                if (errorMessage) setErrorMessage('');
+              }}
               onFocus={() => setIsFocused(true)}
               onBlur={() => setIsFocused(false)}
               placeholder="Search address, city, or place..."
@@ -263,9 +314,9 @@ const LandingPage: React.FC<LandingPageProps> = ({ onSearchSuccess }) => {
             />
 
             {/* Animated Button */}
-            <button 
-              ref={buttonRef} 
-              type="submit" 
+            <button
+              ref={buttonRef}
+              type="submit"
               style={styles.button}
               disabled={isLoading}
             >
@@ -277,11 +328,12 @@ const LandingPage: React.FC<LandingPageProps> = ({ onSearchSuccess }) => {
                   <polyline points="12 5 19 12 12 19"></polyline>
                 </svg>
               )}
-            </button>              
+            </button>
           </div>
+          {errorMessage && <div style={styles.alert}>{errorMessage}</div>}
         </form>
-                <h3 ref={titleRef} style={styles.texting}>
-         MapLayer is a lightweight and powerful geospatial visualization platform designed to make mapping simple and intuitive. It allows users to load, explore, and interact with GeoJSON datasets directly in the browser using a modern React interface. With customizable layers, markers, and seamless OpenLayers integration, MapLayer transforms raw geographic data into meaningful insights. Built for developers, researchers, and analysts, it delivers speed, flexibility, and a clean mapping experience.
+        <h3 ref={titleRef} style={styles.texting} className="description-text">
+          MapLayer is a lightweight and powerful geospatial visualization platform designed to make mapping simple and intuitive. It allows users to load, explore, and interact with GeoJSON datasets directly in the browser using a modern React interface. With customizable layers, markers, and seamless OpenLayers integration, MapLayer transforms raw geographic data into meaningful insights. Built for developers, researchers, and analysts, it delivers speed, flexibility, and a clean mapping experience.
         </h3>
       </div>
     </div>
