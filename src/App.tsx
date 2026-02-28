@@ -5,7 +5,7 @@ import OpenLayerEsri from './components/OpenLayerEsri';
 import LegiScanAPI from './components/LegiScanAPI';
 import { BrowserRouter as Router, Route, Routes } from "react-router-dom";
 import LandingPage from './components/LandingPage';
-
+import TestingPage from './components/TestingPage';
 function App() {
   const [addressData, setAddressData] = useState<any>(null);
   const [searchTerm, setSearchTerm] = useState<string>('');
@@ -22,6 +22,7 @@ function App() {
         <Route path="/open" element={<OpenLayerMap initialAddressData={addressData} initialTerm={searchTerm} />} />
         <Route path="/esri" element={<OpenLayerEsri />} />
         <Route path="/legi" element={<LegiScanAPI />} />
+        <Route path="/test" element={<TestingPage />} />
       </Routes>
     </Router>
   );

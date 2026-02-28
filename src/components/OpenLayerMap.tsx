@@ -46,10 +46,12 @@ const themes = {
 };
 
 const scrollbarStyles = `
-  .custom-scrollbar::-webkit-scrollbar { width: 4px; }
-  .custom-scrollbar::-webkit-scrollbar-track { background: rgba(128, 128, 128, 0.1); border-radius: 4px; }
-  .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(128, 128, 128, 0.3); border-radius: 4px; }
-  .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(128, 128, 128, 0.5); }
+  // .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+  // .custom-scrollbar::-webkit-scrollbar-track { background: rgba(128, 128, 128, 0.1); border-radius: 4px; }
+  // .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(128, 128, 128, 0.3); border-radius: 4px; }
+  // .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(128, 128, 128, 0.5); }
+  .custom-scrollbar::-webkit-scrollbar { width: 0px; height: 0px; }
+  .custom-scrollbar { scrollbar-width: none; -ms-overflow-style: none; }
 `;
 
 const extractColorFromStyle = (style: any): string => {
