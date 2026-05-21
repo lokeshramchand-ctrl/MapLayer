@@ -45,7 +45,7 @@ const SERVICES = {
 const baseConfigs: Omit<LayerConfig, 'getUrl'>[] = [
   // --- PARCELS & ZONING ---
   {
-    radius: 5,
+    radius: 500000,
     topic: 'CA_Parcels',
     service: SERVICES.CA_Parcels,
     layerId: 0,
@@ -55,7 +55,7 @@ const baseConfigs: Omit<LayerConfig, 'getUrl'>[] = [
     })
   },
   {
-    radius: 100,
+    radius: 500000,
     topic: 'CA_ZoningSouth',
     service: SERVICES.CA_ZoningSouth,
     layerId: 0,
@@ -65,7 +65,7 @@ const baseConfigs: Omit<LayerConfig, 'getUrl'>[] = [
     })
   },
   {
-    radius: 100,
+    radius: 500000,
     topic: 'CA_ZoningNorth',
     service: SERVICES.CA_ZoningNorth,
     layerId: 1,
@@ -86,7 +86,7 @@ const baseConfigs: Omit<LayerConfig, 'getUrl'>[] = [
     })
   },
   {
-    radius: 250000,
+    radius: 500000,
     topic: 'CA_CityBoundaries',
     service: SERVICES.CA_CityBoundaries,
     layerId: 0,
@@ -98,7 +98,7 @@ const baseConfigs: Omit<LayerConfig, 'getUrl'>[] = [
 
   // --- INFRASTRUCTURE & FACILITIES ---
   {
-    radius: 1000,
+    radius: 500000,
     topic: 'CA_Highways',
     service: SERVICES.CA_Highways,
     layerId: 0,
@@ -107,7 +107,7 @@ const baseConfigs: Omit<LayerConfig, 'getUrl'>[] = [
     })
   },
   {
-    radius: 500,
+    radius: 500000,
     topic: 'USA_Railroads',
     service: SERVICES.USA_Railroads,
     layerId: 0,
@@ -116,7 +116,7 @@ const baseConfigs: Omit<LayerConfig, 'getUrl'>[] = [
     })
   },
   {
-    radius: 5000,
+    radius: 500000,
     topic: 'CA_Schools',
     service: SERVICES.CA_Schools,
     layerId: 0,
@@ -129,7 +129,7 @@ const baseConfigs: Omit<LayerConfig, 'getUrl'>[] = [
     })
   },
   {
-    radius: 5000,
+    radius: 500000,
     topic: 'USA_Hospitals',
     service: SERVICES.USA_Hospitals,
     layerId: 0,
@@ -142,7 +142,7 @@ const baseConfigs: Omit<LayerConfig, 'getUrl'>[] = [
     })
   },
   {
-    radius: 200, // Small radius for specific structures
+    radius: 500000, // Small radius for specific structures
     topic: 'USA_Structures',
     service: SERVICES.USA_Structures,
     layerId: 0,
@@ -156,7 +156,7 @@ const baseConfigs: Omit<LayerConfig, 'getUrl'>[] = [
 
   // --- ENVIRONMENT & NATURAL FEATURES ---
   {
-    radius: 100000,
+    radius: 500000,
     topic: 'USA_Parks',
     service: SERVICES.USA_Parks,
     layerId: 0,
@@ -166,7 +166,7 @@ const baseConfigs: Omit<LayerConfig, 'getUrl'>[] = [
     })
   },
   {
-    radius: 10000,
+    radius: 500000,
     topic: 'USA_Rivers',
     service: SERVICES.USA_Rivers,
     layerId: 0,
@@ -175,7 +175,7 @@ const baseConfigs: Omit<LayerConfig, 'getUrl'>[] = [
     })
   },
   {
-    radius: 10000,
+    radius: 500000,
     topic: 'USA_Wetlands',
     service: SERVICES.USA_Wetlands,
     layerId: 0,
@@ -187,7 +187,7 @@ const baseConfigs: Omit<LayerConfig, 'getUrl'>[] = [
 
   // --- HAZARDS & EMERGENCIES ---
   {
-    radius: 100000,
+    radius: 500000,
     topic: 'CA_FireHistory',
     service: SERVICES.CA_FireHistory,
     layerId: 0,
@@ -197,7 +197,7 @@ const baseConfigs: Omit<LayerConfig, 'getUrl'>[] = [
     })
   },
   {
-    radius: 100000,
+    radius: 500000,
     topic: 'CA_FireBoundaries',
     service: SERVICES.CA_FireBoundaries,
     layerId: 0,
@@ -207,7 +207,7 @@ const baseConfigs: Omit<LayerConfig, 'getUrl'>[] = [
     })
   },
   {
-    radius: 50000, // Active fires
+    radius: 500000, // Active fires
     topic: 'USA_Wildfire_Perimeters',
     service: SERVICES.USA_Wildfire_Perimeters,
     layerId: 0,
@@ -217,7 +217,7 @@ const baseConfigs: Omit<LayerConfig, 'getUrl'>[] = [
     })
   },
   {
-    radius: 100000,
+    radius: 500000,
     topic: 'CA_Flood',
     service: SERVICES.CA_Flood,
     layerId: 28, // Common layer ID for NFHL flood hazards
@@ -227,7 +227,7 @@ const baseConfigs: Omit<LayerConfig, 'getUrl'>[] = [
     })
   },
   {
-    radius: 100000,
+    radius: 500000,
     topic: 'USGS_Earthquakes',
     service: SERVICES.USGS_Earthquakes,
     layerId: 0, // Layer 0 is typically recent earthquakes
@@ -240,7 +240,7 @@ const baseConfigs: Omit<LayerConfig, 'getUrl'>[] = [
     })
   },
   {
-    radius: 200000, // Large radius for weather warnings
+    radius: 500000, // Large radius for weather warnings
     topic: 'NOAA_WeatherWarnings',
     service: SERVICES.NOAA_WeatherWarnings,
     layerId: 6, // Layer 6 is typically current watches/warnings polygons
