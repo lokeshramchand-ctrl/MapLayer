@@ -12,7 +12,8 @@ import { addMarker } from './Methods/Marker';
 import gsap from 'gsap';
 import { useNavigate } from 'react-router-dom';
 import { easeOut } from 'ol/easing';
-import { ArrowLeft, PanelLeft, PanelRight, Sun, Moon, PanelLeftClose, PanelRightClose } from 'lucide-react';
+import Style from 'ol/style/Style';
+import { ArrowLeft, PanelLeft, PanelRight, Sun, Moon, PanelLeftClose, PanelRightClose, Bot, Send, X } from 'lucide-react';
 
 const themes = {
   dark: {
@@ -52,18 +53,25 @@ const scrollbarStyles = `
   .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(128, 128, 128, 0.5); }
 `;
 
-const extractColorFromStyle = (style: any): string => {
-  if (style.getStroke() && style.getStroke().getColor()) {
-    return style.getStroke().getColor();
+const extractColorFromStyle = (style: Style): string => {
+  const strokeColor = style.getStroke()?.getColor();
+  if (typeof strokeColor === 'string') {
+    return strokeColor;
   }
-  if (style.getFill() && style.getFill().getColor()) {
-    return style.getFill().getColor();
+  const fillColor = style.getFill()?.getColor();
+  if (typeof fillColor === 'string') {
+    return fillColor;
   }
   return '#888888';
 };
 
+interface AddressDatum {
+  lat: string;
+  lon: string;
+}
+
 interface MapViewProps {
-  initialAddressData: any;
+  initialAddressData: AddressDatum[];
   initialTerm: string;
 }
 
@@ -79,6 +87,10 @@ const MapView: React.FC<MapViewProps> = ({ initialAddressData, initialTerm }) =>
   const [clickedCoordinate, setClickedCoordinate] = useState<Coordinate>();
   const [showLeftSidebar, setShowLeftSidebar] = useState(true);
   const [showRightSidebar, setShowRightSidebar] = useState(true);
+  const [showAI, setShowAI] = useState(false);
+  const [aiQuestion, setAiQuestion] = useState('');
+  const [aiResponse, setAiResponse] = useState('');
+  const [aiLoading, setAiLoading] = useState(false);
   const [mapStats, setMapStats] = useState({
     zoom: 2,
     center: [0, 0] as Coordinate,
@@ -86,10 +98,13 @@ const MapView: React.FC<MapViewProps> = ({ initialAddressData, initialTerm }) =>
     size: { width: 0, height: 0 }
   });
 
+  const AI_URL = 'http://localhost:8000/api/chat';
+
   const mapDivRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<Map | null>(null);
   const tileLayerRef = useRef<TileLayer<XYZ> | null>(null);
   const markerLayerRef = useRef<VectorLayer | null>(null);
+  const initialMapUrlRef = useRef(isDarkMode ? themes.dark.mapUrl : themes.light.mapUrl);
   const layerRefs = useRef<Record<string, React.MutableRefObject<VectorLayer | null>>>(
     Object.fromEntries(layerConfigs.map((layer) => [layer.topic, { current: null }]))
   );
@@ -114,7 +129,7 @@ const MapView: React.FC<MapViewProps> = ({ initialAddressData, initialTerm }) =>
     if (!mapRef.current) {
       const baseLayer = new TileLayer({
         source: new XYZ({
-          url: currentTheme.mapUrl,
+          url: initialMapUrlRef.current,
           attributions: '&copy; OpenStreetMap &copy; CARTO'
         })
       });
@@ -147,13 +162,15 @@ const MapView: React.FC<MapViewProps> = ({ initialAddressData, initialTerm }) =>
   }, []);
 
   useEffect(() => {
+    const mapUrl = currentTheme.mapUrl;
+
     if (mapRef.current && tileLayerRef.current) {
         tileLayerRef.current.setSource(new XYZ({
-            url: currentTheme.mapUrl,
+            url: mapUrl,
             attributions: '&copy; OpenStreetMap &copy; CARTO'
         }));
     }
-  }, [isDarkMode]);
+  }, [currentTheme.mapUrl]);
 
   useEffect(() => {
     if (initialAddressData && initialAddressData.length > 0) {
@@ -185,11 +202,45 @@ const MapView: React.FC<MapViewProps> = ({ initialAddressData, initialTerm }) =>
   const centerLonLat = toLonLat(mapStats.center);
   const clickedLonLat = clickedCoordinate ? toLonLat(clickedCoordinate) : null;
   const activeLayerCount = Object.values(layerVisibility).filter(Boolean).length;
+  const visibleLayers = Object.entries(layerVisibility).filter(([, value]) => value).map(([key]) => key);
   const iconProps = {
     size: 20,
     color: currentTheme.iconColor,
     stroke: currentTheme.iconColor,
     strokeWidth: 2.2
+  };
+
+  const askAI = async () => {
+    if (!aiQuestion.trim()) return;
+
+    setAiLoading(true);
+
+    try {
+      const response = await fetch(AI_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          question: aiQuestion,
+          address: initialTerm,
+          coordinates: clickedLonLat
+            ? {
+                lat: clickedLonLat[1],
+                lon: clickedLonLat[0]
+              }
+            : null,
+          visibleLayers
+        })
+      });
+
+      const data = await response.json();
+      setAiResponse(data.answer);
+    } catch {
+      setAiResponse('AI backend unavailable');
+    }
+
+    setAiLoading(false);
   };
 
   const styles = {
@@ -342,6 +393,25 @@ const MapView: React.FC<MapViewProps> = ({ initialAddressData, initialTerm }) =>
       borderRadius: '999px',
       border: `1px solid ${currentTheme.border}`,
       color: currentTheme.textMuted
+    },
+    aiPanel: {
+      position: 'absolute' as const,
+      top: '92px',
+      right: '370px',
+      width: '360px',
+      height: '520px',
+      pointerEvents: 'auto' as const,
+      zIndex: 1500,
+      background: currentTheme.glass,
+      backdropFilter: 'blur(20px)',
+      WebkitBackdropFilter: 'blur(20px)',
+      border: `1px solid ${currentTheme.border}`,
+      borderRadius: '18px',
+      padding: '18px',
+      display: 'flex',
+      flexDirection: 'column' as const,
+      gap: '12px',
+      boxShadow: currentTheme.shadow
     }
   };
 
@@ -407,6 +477,17 @@ const MapView: React.FC<MapViewProps> = ({ initialAddressData, initialTerm }) =>
                 onMouseLeave={(e) => e.currentTarget.style.borderColor = currentTheme.border}
             >
               {showRightSidebar ? <PanelRightClose {...iconProps} /> : <PanelRight {...iconProps} />}
+            </button>
+
+            <button
+                className="floating-ui"
+                style={styles.actionButton}
+                onClick={() => setShowAI(!showAI)}
+                title="GIS AI"
+                onMouseEnter={(e) => e.currentTarget.style.borderColor = isDarkMode ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.4)'}
+                onMouseLeave={(e) => e.currentTarget.style.borderColor = currentTheme.border}
+            >
+              <Bot {...iconProps} />
             </button>
 
         </div>
@@ -502,6 +583,75 @@ const MapView: React.FC<MapViewProps> = ({ initialAddressData, initialTerm }) =>
             </div>
           </div>
         </div>
+
+        {showAI && (
+          <div style={styles.aiPanel}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ fontSize: '12px', fontWeight: 700, letterSpacing: '1px', color: currentTheme.textMuted }}>
+                GIS AI ASSISTANT
+              </div>
+
+              <button
+                style={{ ...styles.actionButton, width: '34px', height: '34px' }}
+                onClick={() => setShowAI(false)}
+                title="Close AI"
+              >
+                <X size={14} color={currentTheme.iconColor} />
+              </button>
+            </div>
+
+            <textarea
+              value={aiQuestion}
+              onChange={e => setAiQuestion(e.target.value)}
+              placeholder="Explain this property"
+              style={{
+                height: '90px',
+                background: currentTheme.bg,
+                border: `1px solid ${currentTheme.border}`,
+                borderRadius: '12px',
+                padding: '12px',
+                resize: 'none',
+                color: currentTheme.textMain,
+                outline: 'none'
+              }}
+            />
+
+            <button
+              onClick={askAI}
+              style={{
+                height: '42px',
+                borderRadius: '12px',
+                border: `1px solid ${currentTheme.border}`,
+                background: currentTheme.glass,
+                cursor: 'pointer',
+                color: currentTheme.textMain,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px'
+              }}
+            >
+              {aiLoading ? 'Thinking...' : <><Send size={16} /> Send</>}
+            </button>
+
+            <div
+              className="custom-scrollbar"
+              style={{
+                flex: 1,
+                overflow: 'auto',
+                background: currentTheme.bg,
+                borderRadius: '12px',
+                padding: '12px',
+                whiteSpace: 'pre-wrap',
+                fontSize: '13px',
+                color: currentTheme.textMain,
+                border: `1px solid ${currentTheme.border}`
+              }}
+            >
+              {aiResponse || 'Ask about parcels, hazards, flood zones, schools, zoning, roads'}
+            </div>
+          </div>
+        )}
 
       </div>
     </div>
