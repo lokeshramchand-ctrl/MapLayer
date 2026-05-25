@@ -126,7 +126,12 @@ const LandingPage: React.FC<LandingPageProps> = ({ onSearchSuccess }) => {
       // Artificial delay for smooth transition feel
       setTimeout(() => {
         onSearchSuccess(validResults, term);
-        navigate('/open');
+        navigate('/open', {
+          state: {
+            addressData: validResults,
+            term
+          }
+        });
       }, 800);
 
     } catch (error) {
