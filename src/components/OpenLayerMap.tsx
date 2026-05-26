@@ -25,7 +25,6 @@ import {
   X,
   Send,
   RotateCcw,
-  ChevronDown,
   MapPin,
   Loader2
 } from 'lucide-react';
@@ -98,6 +97,13 @@ type NearbyFeatureSummary = {
   properties: Record<string, unknown>;
 };
 
+type AISummary = {
+  summary: string;
+  floodZone: { present: boolean; zoneType: string | null; source: string | null };
+  parcels: { present: boolean; parcelId?: string | null; owner?: string | null; zoning?: string | null; source?: string | null } | null;
+  missing_layers: string[];
+};
+
 type ChatMessage = {
   id: string;
   role: 'user' | 'ai';
@@ -138,6 +144,25 @@ const QUICK_PROMPTS = [
   'List active overlays and their significance',
   'Is this a high-risk area?',
 ];
+
+const formatAISummary = (summary: AISummary): string => {
+  const lines: string[] = [];
+  lines.push(summary.summary);
+  lines.push('');
+  lines.push(`Flood zone: ${summary.floodZone.present ? summary.floodZone.zoneType ?? 'present' : 'not found'}`);
+  if (summary.parcels) {
+    lines.push(`Parcel: ${summary.parcels.present ? summary.parcels.parcelId ?? 'present' : 'not found'}`);
+    if (summary.parcels.owner) lines.push(`Owner: ${summary.parcels.owner}`);
+    if (summary.parcels.zoning) lines.push(`Zoning: ${summary.parcels.zoning}`);
+  } else {
+    lines.push('Parcel: not found');
+  }
+  if (summary.missing_layers?.length) {
+    lines.push('');
+    lines.push(`Missing layers: ${summary.missing_layers.join(', ')}`);
+  }
+  return lines.join('\n');
+};
 
 /* ─────────────────────────── Global styles ─────────────────────────── */
 const globalStyles = `
@@ -226,7 +251,6 @@ const MapView: React.FC<MapViewProps> = ({ initialAddressData, initialTerm }) =>
 
   const activeLayerCount = Object.values(layerVisibility).filter(Boolean).length;
   const centerLonLat = toLonLat(mapStats.center);
-  const clickedLonLat = clickedCoordinate ? toLonLat(clickedCoordinate) : null;
 
   const collectNearbyFeatures = (): NearbyFeatureSummary[] => {
     const features: NearbyFeatureSummary[] = [];
@@ -278,11 +302,14 @@ const MapView: React.FC<MapViewProps> = ({ initialAddressData, initialTerm }) =>
         { address: ctx.address, coordinates: ctx.coordinates, activeLayers: activeLayerNames, nearbyLayers: collectNearbyFeatures() },
         query.trim()
       );
-      setMessages((prev) => [...prev, { id: uid(), role: 'ai', text: summary, timestamp: new Date() }]);
-    } catch {
+      const text = formatAISummary(summary as AISummary);
+      setMessages((prev) => [...prev, { id: uid(), role: 'ai', text, timestamp: new Date() }]);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      const msg = message ? `Analysis failed: ${message}` : 'Analysis failed. Check connection and try again.';
       setMessages((prev) => [
         ...prev,
-        { id: uid(), role: 'ai', text: 'Analysis failed. Check connection and try again.', timestamp: new Date() },
+        { id: uid(), role: 'ai', text: msg, timestamp: new Date() },
       ]);
     } finally {
       setAiLoading(false);
@@ -325,7 +352,8 @@ const MapView: React.FC<MapViewProps> = ({ initialAddressData, initialTerm }) =>
             },
             'Summarize impacts near this property'
           );
-          setMessages([{ id: uid(), role: 'ai', text: summary, timestamp: new Date() }]);
+          const text = formatAISummary(summary as AISummary);
+          setMessages([{ id: uid(), role: 'ai', text, timestamp: new Date() }]);
         } catch {
           /* silent */
         } finally {
@@ -334,6 +362,7 @@ const MapView: React.FC<MapViewProps> = ({ initialAddressData, initialTerm }) =>
       })();
     }, 2000);
     return () => window.clearTimeout(timer);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resolvedAddressData, resolvedTerm]);
 
   /* ─────────────── Map init ─────────────── */
@@ -370,7 +399,7 @@ const MapView: React.FC<MapViewProps> = ({ initialAddressData, initialTerm }) =>
         setMapStats({ center, zoom, rotation, size: { width: size?.[0] ?? 0, height: size?.[1] ?? 0 } });
       });
     }
-  }, []);
+  }, [t.mapUrl]);
 
   useEffect(() => {
     if (mapRef.current && tileLayerRef.current) {

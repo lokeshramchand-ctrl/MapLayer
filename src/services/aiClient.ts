@@ -1,20 +1,30 @@
+type NearbyLayerFeature = {
+  layer: string;
+  properties: Record<string, unknown>;
+};
+
+export type AISummary = {
+  summary: string;
+  data_used: { layer: string; featureCount: number; source: string }[];
+  hazards: { type: string; evidence: string; confidence: 'low' | 'medium' | 'high' }[];
+  floodZone: { present: boolean; zoneType: string | null; source: string | null };
+  parcels: { present: boolean; parcelId?: string | null; owner?: string | null; zoning?: string | null; source?: string | null } | null;
+  missing_layers: string[];
+  short_answer?: string;
+};
+
 export interface LayerContext {
   address: string;
   coordinates: {
     lat: number;
     lon: number;
   };
-  nearbyLayers: any[];
+  nearbyLayers: NearbyLayerFeature[];
   activeLayers: string[];
 }
 
 const OLLAMA_URL = 'https://ollama.splsystems.in/api/chat';
-const OLLAMA_MODEL = 'gemma4:latest';
-
-type NearbyLayerFeature = {
-  layer: string;
-  properties: Record<string, unknown>;
-};
+const OLLAMA_MODEL = 'llava:7b';
 
 const buildNearbyLayerDigest = (nearbyLayers: NearbyLayerFeature[]) => {
   const grouped = nearbyLayers.reduce<Map<string, Record<string, unknown>[]>>((acc, feature) => {
@@ -31,32 +41,32 @@ const buildNearbyLayerDigest = (nearbyLayers: NearbyLayerFeature[]) => {
   }));
 };
 
-export async function getAISummary(context: LayerContext, query?: string) {
-  const nearbyLayerDigest = buildNearbyLayerDigest(context.nearbyLayers as NearbyLayerFeature[]);
+export async function getAISummary(context: LayerContext, query?: string): Promise<AISummary> {
+  const nearbyLayerDigest = buildNearbyLayerDigest(context.nearbyLayers);
   const prompt = `
-Use only the provided GIS data. Do not invent weather advisories, zoning details, or infrastructure that are not present in the context.
-If the data is incomplete, say so clearly and explain which layer types are missing.
+You are a geospatial and real-estate analyst. Use ONLY the provided GIS data. Do NOT invent facts. If data is missing, state it explicitly. Prioritize FEMA/NFHL flood zones and cadastral/parcel layers when determining risk and development implications.
 
 Property Context:
 ${JSON.stringify({
-  address: context.address,
-  coordinates: context.coordinates,
-  activeLayers: context.activeLayers,
-  nearbyLayers: nearbyLayerDigest,
-  userQuery: query || 'Provide full location intelligence'
-}, null, 2)}
+    address: context.address,
+    coordinates: context.coordinates,
+    activeLayers: context.activeLayers,
+    nearbyLayers: nearbyLayerDigest,
+    userQuery: query || 'Provide full location intelligence'
+  }, null, 2)}
 
-Return a concise property intelligence report with these sections:
-1. What the loaded layers actually show
-2. Nearby hazards or environmental constraints, only if evidenced by the data
-3. Transportation / access / adjacency signals
-4. Development or zoning implications, only if those layers exist
-5. Real-estate implications
-6. Missing data or uncertainty
-7. Short answer to the user query
+Return JSON exactly matching this schema (no extra text). IMPORTANT: include "parcels" and "floodZone" fields with provenance:
+{
+  "summary": "short text",
+  "data_used": [{ "layer": "string", "featureCount": number, "source": "string" }],
+  "hazards": [{ "type": "string", "evidence": "string", "confidence": "low|medium|high" }],
+  "floodZone": { "present": true|false, "zoneType": "string|null", "source": "string|null" },
+  "parcels": { "present": true|false, "parcelId": "string|null", "owner": "string|null", "zoning": "string|null", "source": "string|null" },
+  "missing_layers": ["string"],
+  "short_answer": "string"
+}
 
-If NOAA weather warnings are not actually present in the loaded features, do not mention weather advisories.
-If no parcel or zoning data is available, say that directly instead of guessing.
+If a field cannot be populated because the corresponding layer is absent, set it to null and list that layer in "missing_layers".
 `;
 
   const response = await fetch(OLLAMA_URL, {
@@ -69,7 +79,7 @@ If no parcel or zoning data is available, say that directly instead of guessing.
       messages: [
         {
           role: 'system',
-          content: 'You are a geospatial and real-estate analyst. Ground every answer in the supplied map context. Do not fabricate missing facts.'
+          content: 'You are a geospatial and real-estate analyst. Ground every answer in the supplied map context. Do not fabricate missing facts. Output ONLY valid JSON as requested by the user.'
         },
         {
           role: 'user',
@@ -86,12 +96,34 @@ If no parcel or zoning data is available, say that directly instead of guessing.
   }
 
   const data = await response.json();
+  const content = data?.message?.content ?? data?.response ?? data;
 
-  const content = data?.message?.content ?? data?.response;
-
-  if (typeof content !== 'string') {
-    throw new Error('AI request returned an unexpected response payload.');
+  let parsed: unknown;
+  try {
+    parsed = typeof content === 'string' ? JSON.parse(content) : content;
+  } catch {
+    throw new Error('AI response was not valid JSON.');
   }
 
-  return content;
+  if (!parsed || typeof parsed !== 'object') {
+    throw new Error('AI request returned an invalid response payload.');
+  }
+
+  const summary = parsed as Partial<AISummary>;
+
+  if (typeof summary.summary !== 'string') throw new Error('AI response is missing `summary`.');
+  if (!Array.isArray(summary.data_used)) throw new Error('AI response is missing `data_used`.');
+  if (!Array.isArray(summary.hazards)) throw new Error('AI response is missing `hazards`.');
+  if (!summary.floodZone || typeof summary.floodZone !== 'object') throw new Error('AI response is missing `floodZone`.');
+  if (!Array.isArray(summary.missing_layers)) throw new Error('AI response is missing `missing_layers`.');
+
+  return {
+    summary: summary.summary,
+    data_used: summary.data_used,
+    hazards: summary.hazards,
+    floodZone: summary.floodZone,
+    parcels: summary.parcels ?? null,
+    missing_layers: summary.missing_layers,
+    short_answer: summary.short_answer,
+  };
 }
