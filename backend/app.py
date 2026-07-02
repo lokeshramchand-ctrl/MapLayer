@@ -1,7 +1,7 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from motor.motor_asyncio import AsyncIOMotorClient
-
+from pymongo.errors import PyMongoError
 app = FastAPI()
 
 # MongoDB Connection
@@ -19,6 +19,17 @@ class PointRequest(BaseModel):
 class PolygonRequest(BaseModel):
     layer_type: str # e.g., 'fire', 'airport', 'coastal'
     geometry: dict  # The GeoJSON polygon from the parcel response
+
+
+# --- 4. Health Check Endpoint ---
+@app.get("/health")
+async def health_check():
+    try:
+        # Lightweight ping command to verify MongoDB connectivity
+        await db.command("ping")
+        return {"status": "ok", "mongodb": "connected"}
+    except PyMongoError as e:
+        return {"status": "error", "mongodb": f"not connected: {str(e)}"}
 
 # --- 1. Geocode Endpoint ---
 @app.post("/api/geocode")
