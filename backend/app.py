@@ -7,8 +7,7 @@ app = FastAPI()
 # MongoDB Connection
 client = AsyncIOMotorClient("mongodb://lokesh:Lokesh%401234@10.10.10.110:27017/?authSource=admin")
 db = client.geodata
-
-# --- Pydantic Models for Clean Architecture ---
+# --- Pydantic Schemas ---
 class AddressRequest(BaseModel):
     address: str
 
@@ -16,35 +15,26 @@ class PointRequest(BaseModel):
     longitude: float
     latitude: float
 
-class PolygonRequest(BaseModel):
-    layer_type: str # e.g., 'fire', 'airport', 'coastal'
-    geometry: dict  # The GeoJSON polygon from the parcel response
+class HazardCheckRequest(BaseModel):
+    geometry: dict  # Expects the GeoJSON Polygon object from the parcel step
 
-
-# --- 4. Health Check Endpoint ---
-@app.get("/health")
-async def health_check():
-    try:
-        # Lightweight ping command to verify MongoDB connectivity
-        await db.command("ping")
-        return {"status": "ok", "mongodb": "connected"}
-    except PyMongoError as e:
-        return {"status": "error", "mongodb": f"not connected: {str(e)}"}
-
-# --- 1. Geocode Endpoint ---
+# --- Endpoint 1: Geocode Address ---
 @app.post("/api/geocode")
-async def get_address_point(req: AddressRequest):
-    # Assuming you have a text index on the address field
-    doc = await db.Address_Points_shapefile.find_one({"address": req.address})
+async def geocode_address(req: AddressRequest):
+    # Highly efficient indexed text search or exact match
+    doc = await db.Address_Points_shapefile.find_one(
+        {"properties.ADDRESS": req.address}, # Adjust field name based on your schema
+        {"geometry": 1, "_id": 0}
+    )
     if not doc:
-        raise HTTPException(status_code=404, detail="Address not found")
+        raise HTTPException(status_code=404, detail="Address not found in database")
     
-    return {"point": doc["geometry"]}
+    return {"coordinates": doc["geometry"]["coordinates"]}
 
-# --- 2. Parcel Boundary Endpoint ---
+# --- Endpoint 2: Fetch Parcel Boundary ---
 @app.post("/api/parcel")
-async def get_parcel(req: PointRequest):
-    query = {
+async def get_parcel_boundary(req: PointRequest):
+    spatial_query = {
         "geometry": {
             "$geoIntersects": {
                 "$geometry": {
@@ -55,42 +45,42 @@ async def get_parcel(req: PointRequest):
         }
     }
     
-    # Check the main parcel collection
-    parcel = await db.Parcels_shapefile.find_one(query)
+    # Querying the unified view handles all geographic zones in a single high-speed pass
+    parcel = await db.All_Parcels_Unified.find_one(
+        spatial_query,
+        {"geometry": 1, "properties.APN": 1, "_id": 0}
+    )
     
     if not parcel:
-        raise HTTPException(status_code=404, detail="No parcel found at these coordinates")
+        raise HTTPException(status_code=404, detail="No parcel boundary found for these coordinates")
         
-    return {"parcel_id": parcel.get("APN"), "geometry": parcel["geometry"]}
-
-# --- 3. Zone/Hazard Evaluation Endpoint ---
-@app.post("/api/zones/check")
-async def check_zone(req: PolygonRequest):
-    # Map the requested layer to your specific MongoDB collection names
-    collections = {
-        "fire": db.Fire_Hazard_Severity_Zones_SD_shapefile,
-        "airport": db.Airport_Safety_Zones_shapefile,
-        "coastal": db.Coastal_Zones_shapefile
+    return {
+        "apn": parcel["properties"].get("APN"),
+        "geometry": parcel["geometry"]
     }
-    
-    target_collection = collections.get(req.layer_type)
-    if not target_collection:
-        raise HTTPException(status_code=400, detail="Invalid layer type requested")
 
-    query = {
+# --- Endpoint 3: Concurrent Hazard Zone Evaluation ---
+@app.post("/api/zones/check")
+async def check_property_hazards(req: HazardCheckRequest):
+    spatial_query = {
         "geometry": {
             "$geoIntersects": {
-                "$geometry": req.geometry
+                "$geometry": req.geometry # The full property boundary polygon
             }
         }
     }
-    
-    intersection = await target_collection.find_one(query)
-    
-    if intersection:
-        return {
-            "intersects": True, 
-            "details": intersection.get("properties", {}) 
-        }
-        
-    return {"intersects": False, "details": None}
+
+    # Helper function to query individual collections concurrently
+    async def check_layer(collection, layer_name):
+        match = await collection.find_one(spatial_query, {"properties": 1, "_id": 0})
+        return layer_name, {"intersects": bool(match), "details": match.get("properties") if match else None}
+
+    # Execute all database spatial evaluations simultaneously via the async event loop
+    results = await asyncio.gather(
+        check_layer(db.Fire_Hazard_Severity_Zones_SD_shapefile, "fire_zone"),
+        check_layer(db.Airport_Safety_Zones_shapefile, "airport_zone"),
+        check_layer(db.Coastal_Zones_shapefile, "coastal_zone")
+    )
+
+    # Convert the gathered tuple results back into a clean dictionary payload
+    return dict(results)
