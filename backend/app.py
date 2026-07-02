@@ -7,7 +7,7 @@ app = FastAPI()
 # MongoDB Connection
 client = AsyncIOMotorClient("mongodb://lokesh:Lokesh%401234@10.10.10.110:27017/?authSource=admin")
 db = client.geodata
-# --- Pydantic Schemas ---
+# --- Pydantic Models for Clean Architecture ---
 class AddressRequest(BaseModel):
     address: str
 
@@ -15,26 +15,41 @@ class PointRequest(BaseModel):
     longitude: float
     latitude: float
 
-class HazardCheckRequest(BaseModel):
-    geometry: dict  # Expects the GeoJSON Polygon object from the parcel step
+class PolygonRequest(BaseModel):
+    geometry: dict  # Receives the entire GeoJSON polygon object from the parcel endpoint
 
-# --- Endpoint 1: Geocode Address ---
+# --- Health Check Endpoint ---
+@app.get("/health")
+async def health_check():
+    try:
+        await db.command("ping")
+        return {"status": "ok", "mongodb": "connected"}
+    except PyMongoError as e:
+        return {"status": "error", "mongodb": f"not connected: {str(e)}"}
+
+# --- 1. Geocode Endpoint ---
 @app.post("/api/geocode")
-async def geocode_address(req: AddressRequest):
-    # Highly efficient indexed text search or exact match
-    doc = await db.Address_Points_shapefile.find_one(
-        {"properties.ADDRESS": req.address}, # Adjust field name based on your schema
-        {"geometry": 1, "_id": 0}
-    )
-    if not doc:
-        raise HTTPException(status_code=404, detail="Address not found in database")
+async def get_address_point(req: AddressRequest):
+    # NOTE: Shapefile imports via ogr2ogr usually nest attributes inside 'properties'.
+    # If your field is flat, change this back to {"address": req.address}
+    query = {
+        "$or": [
+            {"properties.address": req.address},
+            {"properties.ADDRESS": req.address},
+            {"address": req.address} 
+        ]
+    }
     
-    return {"coordinates": doc["geometry"]["coordinates"]}
+    doc = await db.Address_Points_shapefile.find_one(query)
+    if not doc:
+        raise HTTPException(status_code=404, detail="Address not found")
+    
+    return {"point": doc["geometry"]}
 
-# --- Endpoint 2: Fetch Parcel Boundary ---
+# --- 2. Parcel Boundary Endpoint ---
 @app.post("/api/parcel")
-async def get_parcel_boundary(req: PointRequest):
-    spatial_query = {
+async def get_parcel(req: PointRequest):
+    query = {
         "geometry": {
             "$geoIntersects": {
                 "$geometry": {
@@ -45,42 +60,67 @@ async def get_parcel_boundary(req: PointRequest):
         }
     }
     
-    # Querying the unified view handles all geographic zones in a single high-speed pass
-    parcel = await db.All_Parcels_Unified.find_one(
-        spatial_query,
-        {"geometry": 1, "properties.APN": 1, "_id": 0}
-    )
+    # List all your parcel collections to ensure full geographic coverage of San Diego
+    parcel_collections = [
+        db.Parcels_shapefile,
+        db.Parcels_North_shapefile,
+        db.Parcels_South_shapefile,
+        db.Parcels_East_shapefile
+    ]
+    
+    # Check collections concurrently to see which one contains the point
+    async def check_collection(coll):
+        try:
+            return await coll.find_one(query)
+        except Exception:
+            return None
+
+    tasks = [check_collection(c) for c in parcel_collections]
+    results = await asyncio.gather(*tasks)
+    
+    # Extract the first non-null parcel found
+    parcel = next((r for r in results if r is not None), None)
     
     if not parcel:
-        raise HTTPException(status_code=404, detail="No parcel boundary found for these coordinates")
+        raise HTTPException(status_code=404, detail="No parcel found at these coordinates")
         
-    return {
-        "apn": parcel["properties"].get("APN"),
-        "geometry": parcel["geometry"]
-    }
+    # Handle variations in shapefile attribute casing safely
+    properties = parcel.get("properties", {})
+    apn = properties.get("APN") or properties.get("apn") or parcel.get("APN")
+        
+    return {"parcel_id": apn, "geometry": parcel["geometry"]}
 
-# --- Endpoint 3: Concurrent Hazard Zone Evaluation ---
+# --- 3. Master Zone/Hazard Evaluation Endpoint ---
+# This single endpoint evaluates ALL zones at the exact same time
 @app.post("/api/zones/check")
-async def check_property_hazards(req: HazardCheckRequest):
-    spatial_query = {
+async def check_all_zones(req: PolygonRequest):
+    query = {
         "geometry": {
             "$geoIntersects": {
-                "$geometry": req.geometry # The full property boundary polygon
+                "$geometry": req.geometry
             }
         }
     }
+    
+    # Internal helper function to run queries across layers in parallel
+    async def evaluate_layer(collection, layer_name):
+        doc = await collection.find_one(query)
+        if doc:
+            return layer_name, {
+                "intersects": True,
+                "details": doc.get("properties", {})
+            }
+        return layer_name, {
+            "intersects": False,
+            "details": None
+        }
 
-    # Helper function to query individual collections concurrently
-    async def check_layer(collection, layer_name):
-        match = await collection.find_one(spatial_query, {"properties": 1, "_id": 0})
-        return layer_name, {"intersects": bool(match), "details": match.get("properties") if match else None}
-
-    # Execute all database spatial evaluations simultaneously via the async event loop
+    # Execute all 3 geographic layer evaluations completely in parallel
     results = await asyncio.gather(
-        check_layer(db.Fire_Hazard_Severity_Zones_SD_shapefile, "fire_zone"),
-        check_layer(db.Airport_Safety_Zones_shapefile, "airport_zone"),
-        check_layer(db.Coastal_Zones_shapefile, "coastal_zone")
+        evaluate_layer(db.Fire_Hazard_Severity_Zones_SD_shapefile, "fire"),
+        evaluate_layer(db.Airport_Safety_Zones_shapefile, "airport"),
+        evaluate_layer(db.Coastal_Zones_shapefile, "coastal")
     )
-
-    # Convert the gathered tuple results back into a clean dictionary payload
+    
+    # Merges the gathered tuples into a single, clean JSON dictionary response
     return dict(results)
