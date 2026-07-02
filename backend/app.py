@@ -1,10 +1,10 @@
 from motor.motor_asyncio import AsyncIOMotorClient
-
-client = AsyncIOMotorClient("mongodb://mongo.splsystems.in:27017/geodata")
-db = client["geodata"]
+import asyncio
 
 async def test_connection():
-    names = await db.list_collection_names()
-    print("Collections:", names)
+    client = AsyncIOMotorClient("mongodb://lokesh:Lokesh%401234@10.10.10.110:27017/?authSource=admin")
+    db = client["geodata"]
+    collections = await db.list_collection_names()
+    print("✅ Connected! Collections:", collections)
 
-await test_connection()
+asyncio.run(test_connection())
