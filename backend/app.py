@@ -1,13 +1,18 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from motor.motor_asyncio import AsyncIOMotorClient
-from pymongo.errors import PyMongoError
-app = FastAPI()
+import asyncio
+import re
 
-# MongoDB Connection
-client = AsyncIOMotorClient("mongodb://lokesh:Lokesh%401234@10.10.10.110:27017/?authSource=admin")
+app = FastAPI(title="San Diego AI Real Estate Spatial API")
+
+# --- MongoDB Connection ---
+# Make sure to install motor: pip install motor
+uri = "mongodb://lokesh:Lokesh%401234@10.10.10.110:27017/?authSource=admin"
+client = AsyncIOMotorClient(uri)
 db = client.geodata
-# --- Pydantic Models for Clean Architecture ---
+
+# --- Pydantic Data Models ---
 class AddressRequest(BaseModel):
     address: str
 
@@ -16,37 +21,58 @@ class PointRequest(BaseModel):
     latitude: float
 
 class PolygonRequest(BaseModel):
-    geometry: dict  # Receives the entire GeoJSON polygon object from the parcel endpoint
+    geometry: dict
 
-# --- Health Check Endpoint ---
-@app.get("/health")
-async def health_check():
-    try:
-        await db.command("ping")
-        return {"status": "ok", "mongodb": "connected"}
-    except PyMongoError as e:
-        return {"status": "error", "mongodb": f"not connected: {str(e)}"}
-
-# --- 1. Geocode Endpoint ---
+# ==========================================
+# ENDPOINT 1: Geocode (Address -> Point)
+# ==========================================
 @app.post("/api/geocode")
-async def get_address_point(req: AddressRequest):
-    # NOTE: Shapefile imports via ogr2ogr usually nest attributes inside 'properties'.
-    # If your field is flat, change this back to {"address": req.address}
-    query = {
-        "$or": [
-            {"properties.address": req.address},
-            {"properties.ADDRESS": req.address},
-            {"address": req.address} 
-        ]
-    }
+async def geocode_address(req: AddressRequest):
+    address_str = req.address.strip()
     
-    doc = await db.Address_Points_shapefile.find_one(query)
-    if not doc:
-        raise HTTPException(status_code=404, detail="Address not found")
-    
-    return {"point": doc["geometry"]}
+    # 🧠 Regex logic to split "9121 Harmony Grove" into [9121, "Harmony Grove"]
+    match = re.match(r"^(\d+)\s+(.*)", address_str)
 
-# --- 2. Parcel Boundary Endpoint ---
+    if match:
+        addr_number = int(match.group(1))
+        addr_name = match.group(2)
+        primary_street = addr_name.split()[0] # Helps catch variations like "Road" vs "Rd"
+        
+        query = {
+            "properties.ADDRNMBR": addr_number,
+            "properties.ADDRNAME": {"$regex": primary_street, "$options": "i"}
+        }
+    else:
+        # Fallback if no number is provided
+        query = {"properties.ADDRNAME": {"$regex": address_str, "$options": "i"}}
+
+    # 🚀 Memory Optimization: Project only the point geometry and address names
+    doc = await db.Address_Points_shapefile.find_one(
+        query,
+        {"geometry": 1, "properties.ADDRNMBR": 1, "properties.ADDRNAME": 1, "properties.ADDRSFX": 1, "_id": 0}
+    )
+
+    if not doc:
+        raise HTTPException(status_code=404, detail="Address not found in database")
+
+    props = doc.get("properties", {})
+    
+    # Clean up formatting in case of floats like "9121.0"
+    raw_num = props.get('ADDRNMBR', '')
+    house_num = int(raw_num) if isinstance(raw_num, float) and raw_num.is_integer() else raw_num
+    
+    found_address = f"{house_num} {props.get('ADDRNAME', '')} {props.get('ADDRSFX', '')}".strip()
+
+    return {
+        "formatted_address": found_address,
+        "coordinates": doc["geometry"]["coordinates"],
+        "point_geometry": doc["geometry"]
+    }
+
+
+# ==========================================
+# ENDPOINT 2: Fetch Parcel Boundary
+# ==========================================
 @app.post("/api/parcel")
 async def get_parcel(req: PointRequest):
     query = {
@@ -59,42 +85,31 @@ async def get_parcel(req: PointRequest):
             }
         }
     }
-    
-    # List all your parcel collections to ensure full geographic coverage of San Diego
-    parcel_collections = [
-        db.Parcels_shapefile,
-        db.Parcels_North_shapefile,
-        db.Parcels_South_shapefile,
-        db.Parcels_East_shapefile
-    ]
-    
-    # Check collections concurrently to see which one contains the point
-    async def check_collection(coll):
-        try:
-            return await coll.find_one(query)
-        except Exception:
-            return None
 
-    tasks = [check_collection(c) for c in parcel_collections]
-    results = await asyncio.gather(*tasks)
-    
-    # Extract the first non-null parcel found
-    parcel = next((r for r in results if r is not None), None)
-    
+    # 🚀 Memory Optimization: Do not return tax history, just geometry and APN
+    parcel = await db.Parcels_shapefile.find_one(
+        query,
+        {"geometry": 1, "properties.APN": 1, "properties.apn": 1, "_id": 0}
+    )
+
     if not parcel:
-        raise HTTPException(status_code=404, detail="No parcel found at these coordinates")
-        
-    # Handle variations in shapefile attribute casing safely
-    properties = parcel.get("properties", {})
-    apn = properties.get("APN") or properties.get("apn") or parcel.get("APN")
-        
-    return {"parcel_id": apn, "geometry": parcel["geometry"]}
+        raise HTTPException(status_code=404, detail="No parcel boundary found at these coordinates")
 
-# --- 3. Master Zone/Hazard Evaluation Endpoint ---
-# This single endpoint evaluates ALL zones at the exact same time
+    props = parcel.get("properties", {})
+    apn = props.get("APN") or props.get("apn") or "Unknown"
+
+    return {
+        "apn": apn,
+        "geometry": parcel["geometry"]
+    }
+
+
+# ==========================================
+# ENDPOINT 3: Master Hazard Evaluation
+# ==========================================
 @app.post("/api/zones/check")
-async def check_all_zones(req: PolygonRequest):
-    query = {
+async def check_zones(req: PolygonRequest):
+    spatial_query = {
         "geometry": {
             "$geoIntersects": {
                 "$geometry": req.geometry
@@ -102,9 +117,12 @@ async def check_all_zones(req: PolygonRequest):
         }
     }
     
-    # Internal helper function to run queries across layers in parallel
-    async def evaluate_layer(collection, layer_name):
-        doc = await collection.find_one(query)
+    # 🚀 CRITICAL Memory Optimization: Tell Mongo NOT to send the massive polygons back
+    projection = {"geometry": 0, "_id": 0}
+
+    # Internal helper to query a specific layer
+    async def check_layer(collection, layer_name):
+        doc = await collection.find_one(spatial_query, projection)
         if doc:
             return layer_name, {
                 "intersects": True,
@@ -115,12 +133,12 @@ async def check_all_zones(req: PolygonRequest):
             "details": None
         }
 
-    # Execute all 3 geographic layer evaluations completely in parallel
+    # ⚡ Execute all database evaluations SIMULTANEOUSLY
     results = await asyncio.gather(
-        evaluate_layer(db.Fire_Hazard_Severity_Zones_SD_shapefile, "fire"),
-        evaluate_layer(db.Airport_Safety_Zones_shapefile, "airport"),
-        evaluate_layer(db.Coastal_Zones_shapefile, "coastal")
+        check_layer(db.Fire_Hazard_Severity_Zones_SD_shapefile, "fire_zone"),
+        check_layer(db.Airport_Safety_Zones_shapefile, "airport_zone"),
+        check_layer(db.Coastal_Zones_shapefile, "coastal_zone")
     )
-    
-    # Merges the gathered tuples into a single, clean JSON dictionary response
+
+    # Convert the gathered async tuples back into a clean dictionary
     return dict(results)
