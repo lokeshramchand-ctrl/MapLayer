@@ -4,8 +4,6 @@ from motor.motor_asyncio import AsyncIOMotorClient
 import asyncio
 import re
 
-import uvicorn
-
 app = FastAPI(title="ZoningLens")
 
 # --- MongoDB Connection ---
