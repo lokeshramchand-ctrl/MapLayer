@@ -4,7 +4,9 @@ from motor.motor_asyncio import AsyncIOMotorClient
 import asyncio
 import re
 
-app = FastAPI(title="San Diego AI Real Estate Spatial API")
+import uvicorn
+
+app = FastAPI(title="ZoningLens")
 
 # --- MongoDB Connection ---
 # Make sure to install motor: pip install motor
@@ -103,12 +105,11 @@ async def get_parcel(req: PointRequest):
         "geometry": parcel["geometry"]
     }
 
-
 # ==========================================
-# ENDPOINT 3: Master Hazard Evaluation
+# ENDPOINT 3: Fire Hazard Evaluation
 # ==========================================
-@app.post("/api/zones/check")
-async def check_zones(req: PolygonRequest):
+@app.post("/api/zones/fire")
+async def check_fire_zone(req: PolygonRequest):
     spatial_query = {
         "geometry": {
             "$geoIntersects": {
@@ -116,29 +117,56 @@ async def check_zones(req: PolygonRequest):
             }
         }
     }
-    
-    # 🚀 CRITICAL Memory Optimization: Tell Mongo NOT to send the massive polygons back
     projection = {"geometry": 0, "_id": 0}
+    
+    doc = await db.Fire_Hazard_Severity_Zones_SD_shapefile.find_one(spatial_query, projection)
+    
+    return {
+        "layer": "fire_zone",
+        "intersects": bool(doc),
+        "details": doc.get("properties", {}) if doc else None
+    }
 
-    # Internal helper to query a specific layer
-    async def check_layer(collection, layer_name):
-        doc = await collection.find_one(spatial_query, projection)
-        if doc:
-            return layer_name, {
-                "intersects": True,
-                "details": doc.get("properties", {})
+# ==========================================
+# ENDPOINT 4: Airport Safety Evaluation
+# ==========================================
+@app.post("/api/zones/airport")
+async def check_airport_zone(req: PolygonRequest):
+    spatial_query = {
+        "geometry": {
+            "$geoIntersects": {
+                "$geometry": req.geometry
             }
-        return layer_name, {
-            "intersects": False,
-            "details": None
         }
+    }
+    projection = {"geometry": 0, "_id": 0}
+    
+    doc = await db.Airport_Safety_Zones_shapefile.find_one(spatial_query, projection)
+    
+    return {
+        "layer": "airport_zone",
+        "intersects": bool(doc),
+        "details": doc.get("properties", {}) if doc else None
+    }
 
-    # ⚡ Execute all database evaluations SIMULTANEOUSLY
-    results = await asyncio.gather(
-        check_layer(db.Fire_Hazard_Severity_Zones_SD_shapefile, "fire_zone"),
-        check_layer(db.Airport_Safety_Zones_shapefile, "airport_zone"),
-        check_layer(db.Coastal_Zones_shapefile, "coastal_zone")
-    )
-
-    # Convert the gathered async tuples back into a clean dictionary
-    return dict(results)
+# ==========================================
+# ENDPOINT 5: Coastal Zone Evaluation
+# ==========================================
+@app.post("/api/zones/coastal")
+async def check_coastal_zone(req: PolygonRequest):
+    spatial_query = {
+        "geometry": {
+            "$geoIntersects": {
+                "$geometry": req.geometry
+            }
+        }
+    }
+    projection = {"geometry": 0, "_id": 0}
+    
+    doc = await db.Coastal_Zones_shapefile.find_one(spatial_query, projection)
+    
+    return {
+        "layer": "coastal_zone",
+        "intersects": bool(doc),
+        "details": doc.get("properties", {}) if doc else None
+    }
