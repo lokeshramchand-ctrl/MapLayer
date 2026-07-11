@@ -4,8 +4,7 @@ import json
 import asyncio
 
 # Point the Ollama client to your custom server
-client = ollama.AsyncClient(host='http://ollama.splsystems.in:11434')
-
+client = ollama.AsyncClient(host='http://10.10.10.100:11434')
 # We recommend llama3.1 or qwen2.5 for tool calling. Change if using a different model.
 MODEL_NAME = "llama3.1" 
 
@@ -33,8 +32,11 @@ async def chat_with_spatial_agent():
             }
         }
     }]
-
-    messages = [{'role': 'user', 'content': user_prompt}]
+# Add a strict system prompt to force better tool behavior
+    messages = [
+        {'role': 'system', 'content': 'You are a San Diego Real Estate AI. If the user asks about a property, you MUST use the analyze_property_hazards tool to fetch the data. Do not guess.'},
+        {'role': 'user', 'content': user_prompt}
+    ]
 
     # 1. Send the prompt to Ollama
     response = await client.chat(
@@ -43,45 +45,59 @@ async def chat_with_spatial_agent():
         tools=tools
     )
 
-    messages.append(response['message'])
+    message = response['message']
+    messages.append(message)
+    
+    tool_calls = message.get('tool_calls', [])
+    content = message.get('content', '').strip()
 
-    # 2. Check if Ollama decided it needs to use the tool
-    if not response['message'].get('tool_calls'):
+    # --- 🛡️ THE SAFETY NET ---
+    # If the LLM failed to use the native tool API but spit out raw JSON text instead
+    if not tool_calls and "analyze_property_hazards" in content and "{" in content:
+        try:
+            print("⚠️ Agent output raw JSON instead of a tool call. Intercepting and fixing...")
+            parsed_json = json.loads(content)
+            
+            # Extract the address, ignoring any weird <nil> artifacts Llama might generate
+            if "parameters" in parsed_json and "address" in parsed_json["parameters"]:
+                extracted_address = parsed_json["parameters"]["address"]
+                
+                # Manually build the tool call object so the script can proceed
+                tool_calls = [{
+                    'function': {
+                        'name': 'analyze_property_hazards',
+                        'arguments': {'address': extracted_address}
+                    }
+                }]
+        except json.JSONDecodeError:
+            pass # Not valid JSON, let it fall through
+
+    # 2. Check if we have tool calls (either native or intercepted)
+    if not tool_calls:
         print("🤖 Agent answered directly (No tool used):")
-        print(response['message']['content'])
+        print(content)
         return
 
     # 3. Execute the tool call
-    for tool in response['message']['tool_calls']:
+    for tool in tool_calls:
         if tool['function']['name'] == 'analyze_property_hazards':
             target_address = tool['function']['arguments']['address']
-            print(f"🛠️  Agent decided to use tool: analyze_property_hazards(address='{target_address}')")
+            print(f"🛠️ Agent executing tool: analyze_property_hazards(address='{target_address}')")
             
-            # Call your live FastAPI/MCP logic 
-            # (If testing locally before deploying, change to http://localhost:8000/api/geocode etc., 
-            # but since we built the Macro Tool, we can just hit the python logic if running in the same scope, 
-            # OR make a quick HTTP POST to a dedicated macro endpoint. 
-            # For this test, let's assume we mapped the macro tool to an API route for easy HTTP access).
-            
-            # To keep this test script completely detached and simple, let's simulate the MCP 
-            # call by hitting your live endpoints sequentially just like the macro tool does.
             print("⏳ Fetching live data from backend...")
             
-            # --- Simulated Macro Tool Execution for Test Script ---
+            # --- Executing your live APIs ---
             async with httpx.AsyncClient() as http:
-                # Get coordinates
                 geo_res = await http.post("https://backend.deploy.lokeshrc.me/api/geocode", json={"address": target_address})
                 if geo_res.status_code != 200:
                     tool_result = {"error": "Address not found."}
                 else:
-                    # Get Parcel
                     coords = geo_res.json()["coordinates"]
                     parcel_res = await http.post("https://backend.deploy.lokeshrc.me/api/parcel", json={"longitude": coords[0], "latitude": coords[1]})
                     
                     if parcel_res.status_code != 200:
                         tool_result = {"error": "Parcel not found."}
                     else:
-                        # Check Zones
                         geom = parcel_res.json()["geometry"]
                         fire = await http.post("https://backend.deploy.lokeshrc.me/api/zones/fire", json={"geometry": geom})
                         airport = await http.post("https://backend.deploy.lokeshrc.me/api/zones/airport", json={"geometry": geom})
@@ -93,9 +109,9 @@ async def chat_with_spatial_agent():
                             "Coastal Zone": coastal.json()["intersects"]
                         }
             
-            print(f"📥 Tool returned data: {json.dumps(tool_result)}")
+            print(f"📥 Backend returned data: {json.dumps(tool_result)}")
             
-            # Feed the data back to Ollama to generate the final human-readable response
+            # Feed the data back to Ollama
             messages.append({
                 'role': 'tool',
                 'name': tool['function']['name'],
@@ -106,6 +122,3 @@ async def chat_with_spatial_agent():
     final_response = await client.chat(model=MODEL_NAME, messages=messages)
     print("\n🤖 Final Agent Response:")
     print(final_response['message']['content'])
-
-# Run the test
-asyncio.run(chat_with_spatial_agent())
