@@ -8,10 +8,10 @@ client = ollama.AsyncClient(host='http://10.10.10.100:11434')
 MODEL_NAME = "llama3.1"  # Recommended for tool calling
 
 async def chat_with_spatial_agent():
-    print("🤖 Agent initializing...\n")
+    print("Agent initializing...\n")
     
-    user_prompt = "Can you check what zones Hallmark SunnySide comes under? Is it safe?"
-    print(f"👤 User: {user_prompt}\n")
+    user_prompt = "Can you check what zones 5000 Newport Ave comes under? Is it safe?"
+    print(f"User: {user_prompt}\n")
 
     # Define the tool schema
     tools = [{
@@ -46,10 +46,10 @@ async def chat_with_spatial_agent():
     tool_calls = message.get('tool_calls', [])
     content = message.get('content', '').strip()
 
-    # --- Safety net for raw JSON output ---
+    # Safety net for raw JSON output
     if not tool_calls and "analyze_property_hazards" in content and "{" in content:
         try:
-            print("⚠️ Agent output raw JSON instead of a tool call. Intercepting and fixing...")
+            print("Agent output raw JSON instead of a tool call. Intercepting and fixing...")
             parsed_json = json.loads(content)
             if "parameters" in parsed_json and "address" in parsed_json["parameters"]:
                 extracted_address = parsed_json["parameters"]["address"]
@@ -62,18 +62,18 @@ async def chat_with_spatial_agent():
         except json.JSONDecodeError:
             pass
 
-    # 2. If no tool calls, just print the content
+    # If no tool calls, just print the content
     if not tool_calls:
-        print("🤖 Agent answered directly (No tool used):")
+        print("Agent answered directly (No tool used):")
         print(content)
         return
 
-    # 3. Execute the tool call
+    # Execute the tool call
     for tool in tool_calls:
         if tool['function']['name'] == 'analyze_property_hazards':
             target_address = tool['function']['arguments']['address']
-            print(f"🛠️ Agent executing tool: analyze_property_hazards(address='{target_address}')")
-            print("⏳ Fetching live data from backend...")
+            print(f"Agent executing tool: analyze_property_hazards(address='{target_address}')")
+            print("Fetching live data from backend...")
 
             async with httpx.AsyncClient(timeout=30.0) as http:
                 # Geocode
@@ -105,7 +105,7 @@ async def chat_with_spatial_agent():
                             "Coastal Zone": coastal.json()["intersects"]
                         }
 
-            print(f"📥 Backend returned data: {json.dumps(tool_result)}")
+            print(f"Backend returned data: {json.dumps(tool_result)}")
 
             # Feed the data back to Ollama
             messages.append({
@@ -114,11 +114,10 @@ async def chat_with_spatial_agent():
                 'content': json.dumps(tool_result)
             })
 
-    # 4. Get the final synthesized response from the LLM
+    # Final synthesized response from the LLM
     final_response = await client.chat(model=MODEL_NAME, messages=messages)
-    print("\n🤖 Final Agent Response:")
+    print("\nFinal Agent Response:")
     print(final_response['message']['content'])
-
 
 
 if __name__ == "__main__":
