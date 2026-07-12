@@ -227,4 +227,4 @@ async def analyze_property_hazards(address: str) -> dict:
 
 # 2. Mount the MCP server to FastAPI
 # This allows MCP Clients to connect via SSE at /sse
-app.mount("/sse", mcp.get_starlette_app())
+app.mount("/sse", mcp.sse_app)
