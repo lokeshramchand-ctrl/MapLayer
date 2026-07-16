@@ -4,10 +4,19 @@ from motor.motor_asyncio import AsyncIOMotorClient
 from mcp.server.fastmcp import FastMCP
 import asyncio
 import re
-
+from fastapi.middleware.cors import CORSMiddleware
+import ollama
+import json
 import uvicorn
 
 app = FastAPI(title="ZoningLens")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Allows your React app to connect
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 mcp = FastMCP("SanDiegoSpatialAgent")    
 # --- MongoDB Connection ---
 # Make sure to install motor: pip install motor
@@ -25,6 +34,13 @@ class PointRequest(BaseModel):
 
 class PolygonRequest(BaseModel):
     geometry: dict
+
+class ChatRequest(BaseModel):
+    prompt: str
+
+# Setup Ollama Client
+ollama_client = ollama.AsyncClient(host='http://10.10.10.100:11434')
+MODEL_NAME = "llama3.1"
 
 # ==========================================
 # ENDPOINT 1: Geocode (Address -> Point)
@@ -224,6 +240,93 @@ async def analyze_property_hazards(address: str) -> dict:
     
     # Return a clean summary directly to the LLM
     return dict(results)
+
+@app.post("/api/chat")
+async def chat_with_spatial_agent(req: ChatRequest):
+    user_prompt = req.prompt
+
+    # Define the tool schema for Ollama
+    tools = [{
+        'type': 'function',
+        'function': {
+            'name': 'analyze_property_hazards',
+            'description': 'Evaluates a San Diego property for Fire, Airport, and Coastal hazards.',
+            'parameters': {
+                'type': 'object',
+                'properties': {
+                    'address': {
+                        'type': 'string',
+                        'description': 'The street address to check, e.g., "5000 Newport Ave"'
+                    }
+                },
+                'required': ['address']
+            }
+        }
+    }]
+    
+    messages = [
+        {
+            'role': 'system', 
+            'content': (
+                "You are an expert San Diego Real Estate AI. You MUST use the analyze_property_hazards "
+                "tool to answer property questions. When analyzing results: 1. List the zones clearly. "
+                "2. Never attribute risks to a zone if the data says the property is not in that zone."
+            )
+        },
+        {'role': 'user', 'content': user_prompt}
+    ]
+
+    try:
+        # 1. Send the prompt to Ollama
+        response = await ollama_client.chat(model=MODEL_NAME, messages=messages, tools=tools)
+        message = response['message']
+        messages.append(message)
+        
+        tool_calls = message.get('tool_calls', [])
+        content = message.get('content', '').strip()
+
+        # --- Safety net for raw JSON output ---
+        if not tool_calls and "analyze_property_hazards" in content and "{" in content:
+            try:
+                parsed_json = json.loads(content)
+                if "parameters" in parsed_json and "address" in parsed_json["parameters"]:
+                    extracted_address = parsed_json["parameters"]["address"]
+                    tool_calls = [{
+                        'function': {
+                            'name': 'analyze_property_hazards',
+                            'arguments': {'address': extracted_address}
+                        }
+                    }]
+            except json.JSONDecodeError:
+                pass
+
+        # 2. If no tool calls, return the direct response
+        if not tool_calls:
+            return {"message": content}
+
+        # 3. Execute the tool call using your highly optimized backend function!
+        for tool in tool_calls:
+            if tool['function']['name'] == 'analyze_property_hazards':
+                target_address = tool['function']['arguments']['address']
+                
+                # NATIVE FUNCTION CALL: No HTTP overhead needed anymore!
+                tool_result = await analyze_property_hazards(target_address)
+
+                # Feed the data back to Ollama
+                messages.append({
+                    'role': 'tool',
+                    'name': tool['function']['name'],
+                    'content': json.dumps(tool_result)
+                })
+
+        # 4. Get the final synthesized response from the LLM
+        final_response = await ollama_client.chat(model=MODEL_NAME, messages=messages)
+        
+        # Return to React frontend
+        return {"message": final_response['message']['content']}
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 # 2. Mount the MCP server to FastAPI
 # This allows MCP Clients to connect via SSE at /sse
