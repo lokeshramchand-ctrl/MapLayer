@@ -252,11 +252,14 @@ const MapView: React.FC<MapViewProps> = ({
 
     try {
       // Point this to wherever FastAPI is running (e.g., localhost or 10.10.10.100)
-      const response = await fetch("http://192.168.1.100:8000/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: userMessage }),
-      });
+      const response = await fetch(
+        "https://backend.deploy.lokeshrc.me/api/chat",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ prompt: userMessage }),
+        },
+      );
 
       const data = await response.json();
 
