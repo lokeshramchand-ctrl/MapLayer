@@ -1,21 +1,19 @@
-from fastapi import FastAPI, HTTPException, BackgroundTasks
+from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from motor.motor_asyncio import AsyncIOMotorClient
 from mcp.server.fastmcp import FastMCP
 import asyncio
-import re
 from typing import List, Optional
 from fastapi.middleware.cors import CORSMiddleware
 import ollama
 import json
 import uvicorn
-from pymilvus import MilvusClient, DataType
-import mysql.connector
+from pymilvus import MilvusClient
 
 app = FastAPI(title="ZoningLens")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allows your React app to connect
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -45,7 +43,6 @@ class HandbookSearchRequest(BaseModel):
     query: str
     top_k: Optional[int] = None
 
-# --- New Models for CA Codes (MySQL RAG) ---
 class CodeEntry(BaseModel):
     code: str
     title: str
@@ -81,13 +78,7 @@ MILVUS_URI = "http://10.10.10.130:19530"
 HANDBOOK_COLLECTION_NAME = "Zoning_Lens"
 HANDBOOK_TOP_K = 5
 
-# CA Codes MySQL RAG
-MYSQL_HOST = "10.10.10.143"
-MYSQL_PORT = 3306
-MYSQL_USER = "lokesh"
-MYSQL_PASSWORD = "Lokesh@1234"
-MYSQL_DATABASE = "capublic"
-MYSQL_TABLE = "codes_tbl"
+# CA Codes
 CODES_COLLECTION_NAME = "pubinfo_codes"
 CODES_LLM_MODEL = "gemma4:latest"
 
@@ -106,7 +97,6 @@ class RetrievedChunk(BaseModel):
     score: float
 
 async def get_embedding(text: str) -> List[float]:
-    """Reusable async embedding generation."""
     response = await ollama_client.embeddings(model=EMBEDDING_MODEL, prompt=text)
     return response["embedding"]
 
@@ -140,69 +130,8 @@ async def search_pdf_handbook(query: str, top_k: int = HANDBOOK_TOP_K) -> List[R
     ]
 
 # ==========================================
-# CA CODES (MYSQL) RAG METHODS
+# CA CODES RAG METHODS
 # ==========================================
-def fetch_code_entries() -> List[CodeEntry]:
-    """Sync function to fetch codes from MariaDB/MySQL."""
-    conn = mysql.connector.connect(
-        host=MYSQL_HOST,
-        port=MYSQL_PORT,
-        user=MYSQL_USER,
-        password=MYSQL_PASSWORD,
-        database=MYSQL_DATABASE,
-    )
-    cursor = conn.cursor()
-    cursor.execute(f"SELECT code, title FROM {MYSQL_TABLE}")
-    rows = [CodeEntry(code=r[0], title=r[1]) for r in cursor.fetchall()]
-    cursor.close()
-    conn.close()
-    return rows
-
-async def run_codes_ingestion():
-    """Background task to ingest MySQL data into Milvus."""
-    entries = fetch_code_entries()
-    
-    client = get_milvus_client()
-    if client.has_collection(CODES_COLLECTION_NAME):
-        client.drop_collection(CODES_COLLECTION_NAME)
-
-    embedding_dim = len(await get_embedding("dimension probe"))
-
-    schema = client.create_schema(auto_id=True, enable_dynamic_field=True)
-    schema.add_field(field_name="id", datatype=DataType.INT64, is_primary=True)
-    schema.add_field(field_name="vector", datatype=DataType.FLOAT_VECTOR, dim=embedding_dim)
-    schema.add_field(field_name="code", datatype=DataType.VARCHAR, max_length=20)
-    schema.add_field(field_name="title", datatype=DataType.VARCHAR, max_length=2000)
-
-    index_params = client.prepare_index_params()
-    index_params.add_index(field_name="vector", index_type="AUTOINDEX", metric_type="COSINE")
-
-    client.create_collection(
-        collection_name=CODES_COLLECTION_NAME,
-        schema=schema,
-        index_params=index_params,
-    )
-
-    batch_size = 32
-    batch = []
-
-    async def flush_batch(b: List[CodeEntry]):
-        vectors = await asyncio.gather(*(get_embedding(e.to_text()) for e in b))
-        rows = [
-            {"vector": v, "code": e.code, "title": e.title}
-            for v, e in zip(vectors, b)
-        ]
-        client.insert(collection_name=CODES_COLLECTION_NAME, data=rows)
-
-    for entry in entries:
-        batch.append(entry)
-        if len(batch) >= batch_size:
-            await flush_batch(batch)
-            batch = []
-    
-    if batch:
-        await flush_batch(batch)
-
 async def search_ca_codes(query: str, top_k: int = 5) -> List[RetrievedCode]:
     query_vector = await get_embedding(query)
     milvus = get_milvus_client()
@@ -233,9 +162,6 @@ async def search_ca_codes(query: str, top_k: int = 5) -> List[RetrievedCode]:
 # ==========================================
 @mcp.tool()
 async def search_pdf_handbook_tool(query: str, top_k: int = HANDBOOK_TOP_K) -> dict:
-    """
-    Searches the ADU/zoning PDF handbook for rules, definitions, or procedures.
-    """
     try:
         chunks = await search_pdf_handbook(query, top_k=top_k)
     except HTTPException as e:
@@ -251,10 +177,6 @@ async def search_pdf_handbook_tool(query: str, top_k: int = HANDBOOK_TOP_K) -> d
 
 @mcp.tool()
 async def search_ca_codes_tool(query: str, top_k: int = 5) -> dict:
-    """
-    Searches California legislative codes from the public info database.
-    Use this for determining specific CA code abbreviations or titles.
-    """
     try:
         codes = await search_ca_codes(query, top_k=top_k)
     except HTTPException as e:
@@ -270,14 +192,14 @@ async def search_ca_codes_tool(query: str, top_k: int = 5) -> dict:
 
 @mcp.tool()
 async def analyze_property_hazards(address: str) -> dict:
-    """
-    Evaluates a San Diego property for Fire, Airport, and Coastal hazards.
-    """
     address_str = address.strip()
-    match = re.match(r"^(\d+)\s+(.*)", address_str)
+    
+    # String manipulation walk-around to replace regular expressions
+    parts = address_str.split(" ", 1)
 
-    if match:
-        addr_number, addr_name = int(match.group(1)), match.group(2)
+    if len(parts) == 2 and parts[0].isdigit():
+        addr_number = int(parts[0])
+        addr_name = parts[1]
         query = {
             "properties.ADDRNMBR": addr_number,
             "properties.ADDRNAME": {"$regex": addr_name.split()[0], "$options": "i"}
@@ -323,16 +245,8 @@ async def handbook_search_endpoint(req: HandbookSearchRequest):
         raise HTTPException(status_code=404, detail="No relevant passages found.")
     return {"query": req.query, "results": [c.model_dump() for c in chunks]}
 
-# --- New Endpoints for CA Codes ---
-@app.post("/api/codes/ingest")
-async def codes_ingest_endpoint(background_tasks: BackgroundTasks):
-    """Triggers background ingestion of the MySQL database into Milvus."""
-    background_tasks.add_task(run_codes_ingestion)
-    return {"message": "Ingestion started in the background."}
-
 @app.post("/api/codes/search")
 async def codes_search_endpoint(req: CodeSearchRequest):
-    """Raw retrieval of CA Codes from Milvus."""
     codes = await search_ca_codes(req.query, top_k=req.top_k or 5)
     if not codes:
         raise HTTPException(status_code=404, detail="No codes found.")
@@ -340,7 +254,6 @@ async def codes_search_endpoint(req: CodeSearchRequest):
 
 @app.post("/api/codes/rag", response_model=RAGResponse)
 async def codes_rag_endpoint(req: CodeSearchRequest):
-    """Full RAG pipeline for CA codes: retrieval + generative answer."""
     retrieved = await search_ca_codes(req.query, top_k=req.top_k or 5)
     
     context = "\n".join(f"{r.entry.code}: {r.entry.title}" for r in retrieved)
@@ -367,15 +280,16 @@ async def codes_rag_endpoint(req: CodeSearchRequest):
         sources=retrieved
     )
 
-# --- Original Geocoding & Parcel Endpoints ---
 @app.post("/api/geocode")
 async def geocode_address(req: AddressRequest):
     address_str = req.address.strip()
-    match = re.match(r"^(\d+)\s+(.*)", address_str)
+    
+    # String manipulation walk-around to replace regular expressions
+    parts = address_str.split(" ", 1)
 
-    if match:
-        addr_number = int(match.group(1))
-        addr_name = match.group(2)
+    if len(parts) == 2 and parts[0].isdigit():
+        addr_number = int(parts[0])
+        addr_name = parts[1]
         primary_street = addr_name.split()[0] 
         query = {
             "properties.ADDRNMBR": addr_number,
@@ -487,7 +401,7 @@ async def chat_with_spatial_agent(req: ChatRequest):
             'type': 'function',
             'function': {
                 'name': 'search_ca_codes_tool',
-                'description': 'Searches California legislative codes (MariaDB). Use for CA code queries.',
+                'description': 'Searches California legislative codes (Milvus). Use for CA code queries.',
                 'parameters': {
                     'type': 'object',
                     'properties': {
@@ -519,7 +433,6 @@ async def chat_with_spatial_agent(req: ChatRequest):
         tool_calls = message.get('tool_calls', [])
         content = message.get('content', '').strip()
 
-        # Fallback for unstructured tool outputs
         if not tool_calls and content and "{" in content:
             for candidate_tool_name in ("analyze_property_hazards", "search_pdf_handbook_tool", "search_ca_codes_tool"):
                 if candidate_tool_name in content:
@@ -568,7 +481,6 @@ async def chat_with_spatial_agent(req: ChatRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-# 2. Mount the MCP server to FastAPI
 app.mount("/sse", mcp.sse_app)
 
 if __name__ == "__main__":
