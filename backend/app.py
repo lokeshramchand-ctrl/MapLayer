@@ -10,8 +10,8 @@ import ollama
 import json
 import uvicorn
 from pymilvus import MilvusClient, DataType
-import mysql.connector
-
+# Add this line at the top with your other imports
+import pymysql
 app = FastAPI(title="ZoningLens")
 app.add_middleware(
     CORSMiddleware,
@@ -139,23 +139,27 @@ async def search_pdf_handbook(query: str, top_k: int = HANDBOOK_TOP_K) -> List[R
         for hit in results
     ]
 
-# ==========================================
-# CA CODES (MYSQL) RAG METHODS
-# ==========================================
 def fetch_code_entries() -> List[CodeEntry]:
-    """Sync function to fetch codes from MariaDB/MySQL."""
-    conn = mysql.connector.connect(
+    """Sync function to fetch codes from MariaDB/MySQL using PyMySQL."""
+    # Connect to the database
+    connection = pymysql.connect(
         host=MYSQL_HOST,
         port=MYSQL_PORT,
         user=MYSQL_USER,
         password=MYSQL_PASSWORD,
         database=MYSQL_DATABASE,
     )
-    cursor = conn.cursor()
-    cursor.execute(f"SELECT code, title FROM {MYSQL_TABLE}")
-    rows = [CodeEntry(code=r[0], title=r[1]) for r in cursor.fetchall()]
-    cursor.close()
-    conn.close()
+    
+    rows = []
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute(f"SELECT code, title FROM {MYSQL_TABLE}")
+            # Fetch all rows and map them to the CodeEntry model
+            for r in cursor.fetchall():
+                rows.append(CodeEntry(code=r[0], title=r[1]))
+    finally:
+        connection.close()
+        
     return rows
 
 async def run_codes_ingestion():
