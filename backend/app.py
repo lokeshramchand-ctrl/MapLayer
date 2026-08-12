@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, BackgroundTasks
 from pydantic import BaseModel
 from motor.motor_asyncio import AsyncIOMotorClient
 from mcp.server.fastmcp import FastMCP
@@ -9,7 +9,8 @@ from fastapi.middleware.cors import CORSMiddleware
 import ollama
 import json
 import uvicorn
-from pymilvus import MilvusClient
+from pymilvus import MilvusClient, DataType
+import mysql.connector
 
 app = FastAPI(title="ZoningLens")
 app.add_middleware(
@@ -20,8 +21,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 mcp = FastMCP("SanDiegoSpatialAgent")
+
 # --- MongoDB Connection ---
-# Make sure to install motor: pip install motor
 uri = "mongodb://lokesh:Lokesh%401234@10.10.10.110:27017/?authSource=admin"
 client = AsyncIOMotorClient(uri)
 db = client.geodata
@@ -44,25 +45,53 @@ class HandbookSearchRequest(BaseModel):
     query: str
     top_k: Optional[int] = None
 
+# --- New Models for CA Codes (MySQL RAG) ---
+class CodeEntry(BaseModel):
+    code: str
+    title: str
+
+    def to_text(self) -> str:
+        return f"Code abbreviation: {self.code}. Title: {self.title}"
+
+class RetrievedCode(BaseModel):
+    entry: CodeEntry
+    score: float
+
+class RAGResponse(BaseModel):
+    question: str
+    answer: str
+    sources: List[RetrievedCode]
+
+class CodeSearchRequest(BaseModel):
+    query: str
+    top_k: Optional[int] = 5
+
 # Setup Ollama Client
 ollama_client = ollama.AsyncClient(host='http://10.10.10.100:11434')
 
 MODEL_NAME = "llama3.1"
+EMBEDDING_MODEL = "nomic-embed-text-v2-moe:latest"
 
 # ==========================================
-# PDF HANDBOOK RAG CONFIG
-# (transplanted from RAG_PDF_Milvus.ipynb)
+# MILVUS & CONFIGURATIONS
 # ==========================================
-EMBEDDING_MODEL = "nomic-embed-text-v2-moe:latest"
 MILVUS_URI = "http://10.10.10.130:19530"
+
+# PDF Handbook
 HANDBOOK_COLLECTION_NAME = "Zoning_Lens"
 HANDBOOK_TOP_K = 5
 
-# Reuse a single Milvus client for the life of the app, same as the notebook's
-# `client = MilvusClient(uri=settings.milvus_uri)` pattern. Lazily connected so
-# import/startup doesn't fail if Milvus happens to be unreachable at boot.
-_milvus_client: Optional[MilvusClient] = None
+# CA Codes MySQL RAG
+MYSQL_HOST = "10.10.10.143"
+MYSQL_PORT = 3306
+MYSQL_USER = "lokesh"
+MYSQL_PASSWORD = "Lokesh@1234"
+MYSQL_DATABASE = "capublic"
+MYSQL_TABLE = "codes_tbl"
+CODES_COLLECTION_NAME = "pubinfo_codes"
+CODES_LLM_MODEL = "gemma4:latest"
 
+_milvus_client: Optional[MilvusClient] = None
 
 def get_milvus_client() -> MilvusClient:
     global _milvus_client
@@ -70,35 +99,22 @@ def get_milvus_client() -> MilvusClient:
         _milvus_client = MilvusClient(uri=MILVUS_URI)
     return _milvus_client
 
-
 class RetrievedChunk(BaseModel):
     text: str
     page: int
     source: str
     score: float
 
-
-async def get_handbook_embedding(text: str) -> List[float]:
-    """
-    Async equivalent of the notebook's `get_embedding()`, but reuses the
-    existing `ollama_client` already set up in this file instead of raw
-    `requests.post` calls, so it plays nicely with FastAPI's event loop.
-    """
+async def get_embedding(text: str) -> List[float]:
+    """Reusable async embedding generation."""
     response = await ollama_client.embeddings(model=EMBEDDING_MODEL, prompt=text)
     return response["embedding"]
 
-
+# ==========================================
+# PDF HANDBOOK RAG METHODS
+# ==========================================
 async def search_pdf_handbook(query: str, top_k: int = HANDBOOK_TOP_K) -> List[RetrievedChunk]:
-    """
-    Core retrieval logic transplanted from the notebook's `rag_query()`.
-    Embeds the query, runs a Milvus similarity search against the
-    Zoning_Lens collection, and returns the retrieved chunks (text, page,
-    source, score) WITHOUT calling an LLM to synthesize an answer — that part
-    is left to the caller (e.g. the MCP tool or a chat endpoint), since here
-    we only want the retrieval step, not the notebook's `generate_answer()`.
-    """
-    query_vector = await get_handbook_embedding(query)
-
+    query_vector = await get_embedding(query)
     milvus = get_milvus_client()
     try:
         results = milvus.search(
@@ -123,19 +139,102 @@ async def search_pdf_handbook(query: str, top_k: int = HANDBOOK_TOP_K) -> List[R
         for hit in results
     ]
 
+# ==========================================
+# CA CODES (MYSQL) RAG METHODS
+# ==========================================
+def fetch_code_entries() -> List[CodeEntry]:
+    """Sync function to fetch codes from MariaDB/MySQL."""
+    conn = mysql.connector.connect(
+        host=MYSQL_HOST,
+        port=MYSQL_PORT,
+        user=MYSQL_USER,
+        password=MYSQL_PASSWORD,
+        database=MYSQL_DATABASE,
+    )
+    cursor = conn.cursor()
+    cursor.execute(f"SELECT code, title FROM {MYSQL_TABLE}")
+    rows = [CodeEntry(code=r[0], title=r[1]) for r in cursor.fetchall()]
+    cursor.close()
+    conn.close()
+    return rows
 
+async def run_codes_ingestion():
+    """Background task to ingest MySQL data into Milvus."""
+    entries = fetch_code_entries()
+    
+    client = get_milvus_client()
+    if client.has_collection(CODES_COLLECTION_NAME):
+        client.drop_collection(CODES_COLLECTION_NAME)
+
+    embedding_dim = len(await get_embedding("dimension probe"))
+
+    schema = client.create_schema(auto_id=True, enable_dynamic_field=True)
+    schema.add_field(field_name="id", datatype=DataType.INT64, is_primary=True)
+    schema.add_field(field_name="vector", datatype=DataType.FLOAT_VECTOR, dim=embedding_dim)
+    schema.add_field(field_name="code", datatype=DataType.VARCHAR, max_length=20)
+    schema.add_field(field_name="title", datatype=DataType.VARCHAR, max_length=2000)
+
+    index_params = client.prepare_index_params()
+    index_params.add_index(field_name="vector", index_type="AUTOINDEX", metric_type="COSINE")
+
+    client.create_collection(
+        collection_name=CODES_COLLECTION_NAME,
+        schema=schema,
+        index_params=index_params,
+    )
+
+    batch_size = 32
+    batch = []
+
+    async def flush_batch(b: List[CodeEntry]):
+        vectors = await asyncio.gather(*(get_embedding(e.to_text()) for e in b))
+        rows = [
+            {"vector": v, "code": e.code, "title": e.title}
+            for v, e in zip(vectors, b)
+        ]
+        client.insert(collection_name=CODES_COLLECTION_NAME, data=rows)
+
+    for entry in entries:
+        batch.append(entry)
+        if len(batch) >= batch_size:
+            await flush_batch(batch)
+            batch = []
+    
+    if batch:
+        await flush_batch(batch)
+
+async def search_ca_codes(query: str, top_k: int = 5) -> List[RetrievedCode]:
+    query_vector = await get_embedding(query)
+    milvus = get_milvus_client()
+    
+    try:
+        results = milvus.search(
+            collection_name=CODES_COLLECTION_NAME,
+            data=[query_vector],
+            limit=top_k,
+            output_fields=["code", "title"],
+        )[0]
+    except Exception as e:
+        raise HTTPException(
+            status_code=502,
+            detail=f"Milvus search failed for collection '{CODES_COLLECTION_NAME}': {e}",
+        )
+
+    return [
+        RetrievedCode(
+            entry=CodeEntry(code=hit["entity"]["code"], title=hit["entity"]["title"]),
+            score=hit["distance"],
+        )
+        for hit in results
+    ]
+
+# ==========================================
+# MCP TOOLS
+# ==========================================
 @mcp.tool()
 async def search_pdf_handbook_tool(query: str, top_k: int = HANDBOOK_TOP_K) -> dict:
     """
-    Searches the ADU/zoning PDF handbook (indexed in Milvus collection
-    'Zoning_Lens') for passages relevant to `query`. Use this tool whenever a
-    user asks a question about handbook rules, definitions, or procedures
-    (e.g. "What are the setback requirements for an ADU?") rather than a
-    specific property's hazard zones — that's what `analyze_property_hazards`
-    is for.
-
-    Returns the top matching chunks with their page number, source file, and
-    similarity score so the calling LLM can ground its answer in the text.
+    Searches the ADU/zoning PDF handbook for rules, definitions, or procedures.
     """
     try:
         chunks = await search_pdf_handbook(query, top_k=top_k)
@@ -150,175 +249,30 @@ async def search_pdf_handbook_tool(query: str, top_k: int = HANDBOOK_TOP_K) -> d
         "results": [c.model_dump() for c in chunks],
     }
 
-
-@app.post("/api/handbook/search")
-async def handbook_search_endpoint(req: HandbookSearchRequest):
+@mcp.tool()
+async def search_ca_codes_tool(query: str, top_k: int = 5) -> dict:
     """
-    HTTP endpoint wrapping search_pdf_handbook() for direct use by the React
-    frontend (bypasses the LLM tool-calling path in /api/chat).
+    Searches California legislative codes from the public info database.
+    Use this for determining specific CA code abbreviations or titles.
     """
-    top_k = req.top_k or HANDBOOK_TOP_K
-    chunks = await search_pdf_handbook(req.query, top_k=top_k)
-    if not chunks:
-        raise HTTPException(status_code=404, detail="No relevant passages found in the handbook.")
-    return {"query": req.query, "results": [c.model_dump() for c in chunks]}
+    try:
+        codes = await search_ca_codes(query, top_k=top_k)
+    except HTTPException as e:
+        return {"error": e.detail}
 
-
-# ==========================================
-# ENDPOINT 1: Geocode (Address -> Point)
-# ==========================================
-@app.post("/api/geocode")
-async def geocode_address(req: AddressRequest):
-    address_str = req.address.strip()
-
-    # 🧠 Regex logic to split "9121 Harmony Grove" into [9121, "Harmony Grove"]
-    match = re.match(r"^(\d+)\s+(.*)", address_str)
-
-    if match:
-        addr_number = int(match.group(1))
-        addr_name = match.group(2)
-        primary_street = addr_name.split()[0]  # Helps catch variations like "Road" vs "Rd"
-
-        query = {
-            "properties.ADDRNMBR": addr_number,
-            "properties.ADDRNAME": {"$regex": primary_street, "$options": "i"}
-        }
-    else:
-        # Fallback if no number is provided
-        query = {"properties.ADDRNAME": {"$regex": address_str, "$options": "i"}}
-
-    # 🚀 Memory Optimization: Project only the point geometry and address names
-    doc = await db.Address_Points_shapefile.find_one(
-        query,
-        {"geometry": 1, "properties.ADDRNMBR": 1, "properties.ADDRNAME": 1, "properties.ADDRSFX": 1, "_id": 0}
-    )
-
-    if not doc:
-        raise HTTPException(status_code=404, detail="Address not found in database")
-
-    props = doc.get("properties", {})
-
-    # Clean up formatting in case of floats like "9121.0"
-    raw_num = props.get('ADDRNMBR', '')
-    house_num = int(raw_num) if isinstance(raw_num, float) and raw_num.is_integer() else raw_num
-
-    found_address = f"{house_num} {props.get('ADDRNAME', '')} {props.get('ADDRSFX', '')}".strip()
+    if not codes:
+        return {"error": f"No relevant legislative codes found for '{query}'."}
 
     return {
-        "formatted_address": found_address,
-        "coordinates": doc["geometry"]["coordinates"],
-        "point_geometry": doc["geometry"]
+        "query": query,
+        "results": [c.model_dump() for c in codes]
     }
-
-
-# ==========================================
-# ENDPOINT 2: Fetch Parcel Boundary
-# ==========================================
-@app.post("/api/parcel")
-async def get_parcel(req: PointRequest):
-    query = {
-        "geometry": {
-            "$geoIntersects": {
-                "$geometry": {
-                    "type": "Point",
-                    "coordinates": [req.longitude, req.latitude]
-                }
-            }
-        }
-    }
-
-    # 🚀 Memory Optimization: Do not return tax history, just geometry and APN
-    parcel = await db.Parcels_shapefile.find_one(
-        query,
-        {"geometry": 1, "properties.APN": 1, "properties.apn": 1, "_id": 0}
-    )
-
-    if not parcel:
-        raise HTTPException(status_code=404, detail="No parcel boundary found at these coordinates")
-
-    props = parcel.get("properties", {})
-    apn = props.get("APN") or props.get("apn") or "Unknown"
-
-    return {
-        "apn": apn,
-        "geometry": parcel["geometry"]
-    }
-
-# ==========================================
-# ENDPOINT 3: Fire Hazard Evaluation
-# ==========================================
-@app.post("/api/zones/fire")
-async def check_fire_zone(req: PolygonRequest):
-    spatial_query = {
-        "geometry": {
-            "$geoIntersects": {
-                "$geometry": req.geometry
-            }
-        }
-    }
-    projection = {"geometry": 0, "_id": 0}
-
-    doc = await db.Fire_Hazard_Severity_Zones_SD_shapefile.find_one(spatial_query, projection)
-
-    return {
-        "layer": "fire_zone",
-        "intersects": bool(doc),
-        "details": doc.get("properties", {}) if doc else None
-    }
-
-# ==========================================
-# ENDPOINT 4: Airport Safety Evaluation
-# ==========================================
-@app.post("/api/zones/airport")
-async def check_airport_zone(req: PolygonRequest):
-    spatial_query = {
-        "geometry": {
-            "$geoIntersects": {
-                "$geometry": req.geometry
-            }
-        }
-    }
-    projection = {"geometry": 0, "_id": 0}
-
-    doc = await db.Airport_Safety_Zones_shapefile.find_one(spatial_query, projection)
-
-    return {
-        "layer": "airport_zone",
-        "intersects": bool(doc),
-        "details": doc.get("properties", {}) if doc else None
-    }
-
-# ==========================================
-# ENDPOINT 5: Coastal Zone Evaluation
-# ==========================================
-@app.post("/api/zones/coastal")
-async def check_coastal_zone(req: PolygonRequest):
-    spatial_query = {
-        "geometry": {
-            "$geoIntersects": {
-                "$geometry": req.geometry
-            }
-        }
-    }
-    projection = {"geometry": 0, "_id": 0}
-
-    doc = await db.Coastal_Zones_shapefile.find_one(spatial_query, projection)
-
-    return {
-        "layer": "coastal_zone",
-        "intersects": bool(doc),
-        "details": doc.get("properties", {}) if doc else None
-    }
-
 
 @mcp.tool()
 async def analyze_property_hazards(address: str) -> dict:
     """
     Evaluates a San Diego property for Fire, Airport, and Coastal hazards.
-    Use this tool whenever a user asks if a property is safe, what zones it is in,
-    or requests an analysis of a specific street address.
     """
-    # 1. Geocode inside the tool (reusing your regex logic)
     address_str = address.strip()
     match = re.match(r"^(\d+)\s+(.*)", address_str)
 
@@ -336,8 +290,6 @@ async def analyze_property_hazards(address: str) -> dict:
         return {"error": f"Could not find address '{address}' in San Diego database."}
 
     point_geom = addr_doc["geometry"]
-
-    # 2. Get Parcel Boundary
     parcel_query = {"geometry": {"$geoIntersects": {"$geometry": point_geom}}}
     parcel_doc = await db.Parcels_shapefile.find_one(parcel_query, {"geometry": 1, "_id": 0})
 
@@ -345,8 +297,6 @@ async def analyze_property_hazards(address: str) -> dict:
         return {"error": f"Found coordinates for '{address}', but no parcel boundary exists there."}
 
     parcel_geom = parcel_doc["geometry"]
-
-    # 3. Check Zones Simultaneously
     spatial_query = {"geometry": {"$geoIntersects": {"$geometry": parcel_geom}}}
     projection = {"geometry": 0, "_id": 0}
 
@@ -360,14 +310,150 @@ async def analyze_property_hazards(address: str) -> dict:
         check_layer(db.Coastal_Zones_shapefile, "Coastal Zone")
     )
 
-    # Return a clean summary directly to the LLM
     return dict(results)
+
+# ==========================================
+# ENDPOINTS: REST APIs
+# ==========================================
+@app.post("/api/handbook/search")
+async def handbook_search_endpoint(req: HandbookSearchRequest):
+    top_k = req.top_k or HANDBOOK_TOP_K
+    chunks = await search_pdf_handbook(req.query, top_k=top_k)
+    if not chunks:
+        raise HTTPException(status_code=404, detail="No relevant passages found.")
+    return {"query": req.query, "results": [c.model_dump() for c in chunks]}
+
+# --- New Endpoints for CA Codes ---
+@app.post("/api/codes/ingest")
+async def codes_ingest_endpoint(background_tasks: BackgroundTasks):
+    """Triggers background ingestion of the MySQL database into Milvus."""
+    background_tasks.add_task(run_codes_ingestion)
+    return {"message": "Ingestion started in the background."}
+
+@app.post("/api/codes/search")
+async def codes_search_endpoint(req: CodeSearchRequest):
+    """Raw retrieval of CA Codes from Milvus."""
+    codes = await search_ca_codes(req.query, top_k=req.top_k or 5)
+    if not codes:
+        raise HTTPException(status_code=404, detail="No codes found.")
+    return {"query": req.query, "results": [c.model_dump() for c in codes]}
+
+@app.post("/api/codes/rag", response_model=RAGResponse)
+async def codes_rag_endpoint(req: CodeSearchRequest):
+    """Full RAG pipeline for CA codes: retrieval + generative answer."""
+    retrieved = await search_ca_codes(req.query, top_k=req.top_k or 5)
+    
+    context = "\n".join(f"{r.entry.code}: {r.entry.title}" for r in retrieved)
+    system_prompt = (
+        "You are an assistant for question-answering tasks about California legislative codes."
+        "Use the following pieces of retrieved context to answer the question."
+        "If the answer is not in the context, explicitly state that you don't know."
+        "Keep your answers concise, accurate, and directly address the prompt.\n\n"
+        f"Context:\n{context}"
+    )
+    
+    response = await ollama_client.chat(
+        model=CODES_LLM_MODEL,
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": req.query},
+        ],
+        options={"temperature": 0.1}
+    )
+    
+    return RAGResponse(
+        question=req.query,
+        answer=response["message"]["content"],
+        sources=retrieved
+    )
+
+# --- Original Geocoding & Parcel Endpoints ---
+@app.post("/api/geocode")
+async def geocode_address(req: AddressRequest):
+    address_str = req.address.strip()
+    match = re.match(r"^(\d+)\s+(.*)", address_str)
+
+    if match:
+        addr_number = int(match.group(1))
+        addr_name = match.group(2)
+        primary_street = addr_name.split()[0] 
+        query = {
+            "properties.ADDRNMBR": addr_number,
+            "properties.ADDRNAME": {"$regex": primary_street, "$options": "i"}
+        }
+    else:
+        query = {"properties.ADDRNAME": {"$regex": address_str, "$options": "i"}}
+
+    doc = await db.Address_Points_shapefile.find_one(
+        query,
+        {"geometry": 1, "properties.ADDRNMBR": 1, "properties.ADDRNAME": 1, "properties.ADDRSFX": 1, "_id": 0}
+    )
+
+    if not doc:
+        raise HTTPException(status_code=404, detail="Address not found in database")
+
+    props = doc.get("properties", {})
+    raw_num = props.get('ADDRNMBR', '')
+    house_num = int(raw_num) if isinstance(raw_num, float) and raw_num.is_integer() else raw_num
+    found_address = f"{house_num} {props.get('ADDRNAME', '')} {props.get('ADDRSFX', '')}".strip()
+
+    return {
+        "formatted_address": found_address,
+        "coordinates": doc["geometry"]["coordinates"],
+        "point_geometry": doc["geometry"]
+    }
+
+@app.post("/api/parcel")
+async def get_parcel(req: PointRequest):
+    query = {
+        "geometry": {
+            "$geoIntersects": {
+                "$geometry": {
+                    "type": "Point",
+                    "coordinates": [req.longitude, req.latitude]
+                }
+            }
+        }
+    }
+
+    parcel = await db.Parcels_shapefile.find_one(
+        query,
+        {"geometry": 1, "properties.APN": 1, "properties.apn": 1, "_id": 0}
+    )
+
+    if not parcel:
+        raise HTTPException(status_code=404, detail="No parcel boundary found at these coordinates")
+
+    props = parcel.get("properties", {})
+    apn = props.get("APN") or props.get("apn") or "Unknown"
+
+    return {
+        "apn": apn,
+        "geometry": parcel["geometry"]
+    }
+
+@app.post("/api/zones/fire")
+async def check_fire_zone(req: PolygonRequest):
+    spatial_query = {"geometry": {"$geoIntersects": {"$geometry": req.geometry}}}
+    doc = await db.Fire_Hazard_Severity_Zones_SD_shapefile.find_one(spatial_query, {"geometry": 0, "_id": 0})
+    return {"layer": "fire_zone", "intersects": bool(doc), "details": doc.get("properties", {}) if doc else None}
+
+@app.post("/api/zones/airport")
+async def check_airport_zone(req: PolygonRequest):
+    spatial_query = {"geometry": {"$geoIntersects": {"$geometry": req.geometry}}}
+    doc = await db.Airport_Safety_Zones_shapefile.find_one(spatial_query, {"geometry": 0, "_id": 0})
+    return {"layer": "airport_zone", "intersects": bool(doc), "details": doc.get("properties", {}) if doc else None}
+
+@app.post("/api/zones/coastal")
+async def check_coastal_zone(req: PolygonRequest):
+    spatial_query = {"geometry": {"$geoIntersects": {"$geometry": req.geometry}}}
+    doc = await db.Coastal_Zones_shapefile.find_one(spatial_query, {"geometry": 0, "_id": 0})
+    return {"layer": "coastal_zone", "intersects": bool(doc), "details": doc.get("properties", {}) if doc else None}
 
 @app.post("/api/chat")
 async def chat_with_spatial_agent(req: ChatRequest):
     user_prompt = req.prompt
 
-    # Define the tool schemas for Ollama
     tools = [
         {
             'type': 'function',
@@ -377,10 +463,7 @@ async def chat_with_spatial_agent(req: ChatRequest):
                 'parameters': {
                     'type': 'object',
                     'properties': {
-                        'address': {
-                            'type': 'string',
-                            'description': 'The street address to check, e.g., "5000 Newport Ave"'
-                        }
+                        'address': {'type': 'string', 'description': 'The street address to check.'}
                     },
                     'required': ['address']
                 }
@@ -390,17 +473,25 @@ async def chat_with_spatial_agent(req: ChatRequest):
             'type': 'function',
             'function': {
                 'name': 'search_pdf_handbook_tool',
-                'description': (
-                    'Searches the ADU/zoning PDF handbook for passages relevant to a question '
-                    'about rules, definitions, or procedures (not for property-specific hazard checks).'
-                ),
+                'description': 'Searches the ADU/zoning PDF handbook for rules, definitions, or procedures.',
                 'parameters': {
                     'type': 'object',
                     'properties': {
-                        'query': {
-                            'type': 'string',
-                            'description': 'The question or topic to search the handbook for, e.g., "ADU setback requirements"'
-                        }
+                        'query': {'type': 'string', 'description': 'The topic to search for.'}
+                    },
+                    'required': ['query']
+                }
+            }
+        },
+        {
+            'type': 'function',
+            'function': {
+                'name': 'search_ca_codes_tool',
+                'description': 'Searches California legislative codes (MariaDB). Use for CA code queries.',
+                'parameters': {
+                    'type': 'object',
+                    'properties': {
+                        'query': {'type': 'string', 'description': 'The code title or abbreviation to search for.'}
                     },
                     'required': ['query']
                 }
@@ -412,19 +503,15 @@ async def chat_with_spatial_agent(req: ChatRequest):
         {
             'role': 'system',
             'content': (
-                "You are an expert San Diego Real Estate AI. You MUST use the analyze_property_hazards "
-                "tool to answer property-specific hazard questions, and the search_pdf_handbook_tool "
-                "to answer questions about handbook rules, definitions, or procedures. When analyzing "
-                "results: 1. List the zones or handbook passages clearly. 2. Never attribute risks to a "
-                "zone if the data says the property is not in that zone. 3. Ground handbook answers only "
-                "in the retrieved passages, and say so if the handbook doesn't cover something."
+                "You are an expert San Diego Real Estate AI. Use `analyze_property_hazards` for hazard zones, "
+                "`search_pdf_handbook_tool` for handbook queries, and `search_ca_codes_tool` for CA legislative codes. "
+                "Base answers entirely on retrieved data."
             )
         },
         {'role': 'user', 'content': user_prompt}
     ]
 
     try:
-        # 1. Send the prompt to Ollama
         response = await ollama_client.chat(model=MODEL_NAME, messages=messages, tools=tools)
         message = response['message']
         messages.append(message)
@@ -432,9 +519,9 @@ async def chat_with_spatial_agent(req: ChatRequest):
         tool_calls = message.get('tool_calls', [])
         content = message.get('content', '').strip()
 
-        # --- Safety net for raw JSON output ---
+        # Fallback for unstructured tool outputs
         if not tool_calls and content and "{" in content:
-            for candidate_tool_name in ("analyze_property_hazards", "search_pdf_handbook_tool"):
+            for candidate_tool_name in ("analyze_property_hazards", "search_pdf_handbook_tool", "search_ca_codes_tool"):
                 if candidate_tool_name in content:
                     try:
                         parsed_json = json.loads(content)
@@ -451,45 +538,38 @@ async def chat_with_spatial_agent(req: ChatRequest):
                         pass
                     break
 
-        # 2. If no tool calls, return the direct response
         if not tool_calls:
             return {"message": content}
 
-        # 3. Execute the tool call(s) using the native functions
         for tool in tool_calls:
             tool_name = tool['function']['name']
 
             if tool_name == 'analyze_property_hazards':
                 target_address = tool['function']['arguments']['address']
                 tool_result = await analyze_property_hazards(target_address)
-
             elif tool_name == 'search_pdf_handbook_tool':
                 target_query = tool['function']['arguments']['query']
                 tool_result = await search_pdf_handbook_tool(target_query)
-
+            elif tool_name == 'search_ca_codes_tool':
+                target_query = tool['function']['arguments']['query']
+                tool_result = await search_ca_codes_tool(target_query)
             else:
                 continue
 
-            # Feed the data back to Ollama
             messages.append({
                 'role': 'tool',
                 'name': tool_name,
                 'content': json.dumps(tool_result)
             })
 
-        # 4. Get the final synthesized response from the LLM
         final_response = await ollama_client.chat(model=MODEL_NAME, messages=messages)
-
-        # Return to React frontend
         return {"message": final_response['message']['content']}
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 # 2. Mount the MCP server to FastAPI
-# This allows MCP Clients to connect via SSE at /sse
 app.mount("/sse", mcp.sse_app)
-
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
