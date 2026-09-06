@@ -80,7 +80,7 @@ HANDBOOK_TOP_K = 5
 
 # CA Codes
 CODES_COLLECTION_NAME = "pubinfo_codes"
-CODES_LLM_MODEL = "gemma4:latest"
+CODES_LLM_MODEL = "llama3.1"
 
 _milvus_client: Optional[MilvusClient] = None
 

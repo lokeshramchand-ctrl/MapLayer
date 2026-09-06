@@ -1,0 +1,170 @@
+{
+  ".vite/deps/_metadata.json": {
+    "mtime": 1784485689.2209659,
+    "seen": 1788698126.3517108,
+    "ast_hash": "449173f7a5d6b11e9de76ce798739321",
+    "semantic_hash": "449173f7a5d6b11e9de76ce798739321"
+  },
+  ".vite/deps/package.json": {
+    "mtime": 1784485689.2289658,
+    "seen": 1788698126.3517146,
+    "ast_hash": "d0707362e90f00edd12435e9d3b9d71c",
+    "semantic_hash": "d0707362e90f00edd12435e9d3b9d71c"
+  },
+  "backend/app.py": {
+    "mtime": 1786557785.8291395,
+    "seen": 1788698126.3517158,
+    "ast_hash": "ebb8f9b628507f2bb2f9743f117e03f0",
+    "semantic_hash": "ebb8f9b628507f2bb2f9743f117e03f0"
+  },
+  "backend/test_agent.py": {
+    "mtime": 1784485689.4129658,
+    "seen": 1788698126.3517168,
+    "ast_hash": "0839dd8cf4e9b7b6b1b1454f1a11e595",
+    "semantic_hash": "0839dd8cf4e9b7b6b1b1454f1a11e595"
+  },
+  "frontend/eslint.config.js": {
+    "mtime": 1784485199.484966,
+    "seen": 1788698126.3517177,
+    "ast_hash": "a859553e5d59b7217275e3e99daef762",
+    "semantic_hash": "a859553e5d59b7217275e3e99daef762"
+  },
+  "frontend/package.json": {
+    "mtime": 1784485199.580966,
+    "seen": 1788698126.3517184,
+    "ast_hash": "658ff9e016f80d27c7051f41e127c5a0",
+    "semantic_hash": "658ff9e016f80d27c7051f41e127c5a0"
+  },
+  "frontend/src/App.tsx": {
+    "mtime": 1784485199.136966,
+    "seen": 1788698126.3517191,
+    "ast_hash": "9a2c2fa60f66166325299691307d8adb",
+    "semantic_hash": "9a2c2fa60f66166325299691307d8adb"
+  },
+  "frontend/src/components/LandingPage.tsx": {
+    "mtime": 1785553951.2110753,
+    "seen": 1788698126.3517196,
+    "ast_hash": "06fcec73723ac22ef9b26b8814da5e5c",
+    "semantic_hash": "06fcec73723ac22ef9b26b8814da5e5c"
+  },
+  "frontend/src/components/LegiScanAPI.tsx": {
+    "mtime": 1784485199.212966,
+    "seen": 1788698126.3517203,
+    "ast_hash": "c27918ab6da72fa912ec9fcedd473338",
+    "semantic_hash": "c27918ab6da72fa912ec9fcedd473338"
+  },
+  "frontend/src/components/Methods/GeoJson_Load.tsx": {
+    "mtime": 1784485199.284966,
+    "seen": 1788698126.351721,
+    "ast_hash": "4e65508e5d9da7be66ccae2df0e94925",
+    "semantic_hash": "4e65508e5d9da7be66ccae2df0e94925"
+  },
+  "frontend/src/components/Methods/Layers.tsx": {
+    "mtime": 1784485199.320966,
+    "seen": 1788698126.3517215,
+    "ast_hash": "dfa09f1038133b676d790550a4650f56",
+    "semantic_hash": "dfa09f1038133b676d790550a4650f56"
+  },
+  "frontend/src/components/Methods/Marker.tsx": {
+    "mtime": 1784485199.300966,
+    "seen": 1788698126.3517222,
+    "ast_hash": "be50bc1208d941e44ad86975268f264e",
+    "semantic_hash": "be50bc1208d941e44ad86975268f264e"
+  },
+  "frontend/src/components/OpenLayerEsri.tsx": {
+    "mtime": 1784485199.2369661,
+    "seen": 1788698126.351723,
+    "ast_hash": "65c086a95740c114dd3c99a3c28088f4",
+    "semantic_hash": "65c086a95740c114dd3c99a3c28088f4"
+  },
+  "frontend/src/components/OpenLayerMap.tsx": {
+    "mtime": 1785553799.6030774,
+    "seen": 1788698126.3517234,
+    "ast_hash": "a71600ac328b8b8cf43a862bd93703b0",
+    "semantic_hash": "a71600ac328b8b8cf43a862bd93703b0"
+  },
+  "frontend/src/components/Projectpage.tsx": {
+    "mtime": 1784485199.344966,
+    "seen": 1788698126.3517241,
+    "ast_hash": "44b3ce988d9b603bd5adcb1a9a18bd5d",
+    "semantic_hash": "44b3ce988d9b603bd5adcb1a9a18bd5d"
+  },
+  "frontend/src/main.tsx": {
+    "mtime": 1784485199.408966,
+    "seen": 1788698126.3517246,
+    "ast_hash": "df3369963799e47ef5a77cdca932abf0",
+    "semantic_hash": "df3369963799e47ef5a77cdca932abf0"
+  },
+  "frontend/src/vite-env.d.ts": {
+    "mtime": 1784485199.380966,
+    "seen": 1788698126.3517253,
+    "ast_hash": "8f68c27c3fc38817b2726b20e2d4f1ee",
+    "semantic_hash": "8f68c27c3fc38817b2726b20e2d4f1ee"
+  },
+  "frontend/tsconfig.app.json": {
+    "mtime": 1784485199.424966,
+    "seen": 1788698126.3517258,
+    "ast_hash": "785b526470ff191e2cd1281a7a560984",
+    "semantic_hash": "785b526470ff191e2cd1281a7a560984"
+  },
+  "frontend/tsconfig.json": {
+    "mtime": 1784485199.436966,
+    "seen": 1788698126.3517265,
+    "ast_hash": "852c3a5df14a4b43ac28e9554ebedf4a",
+    "semantic_hash": "852c3a5df14a4b43ac28e9554ebedf4a"
+  },
+  "frontend/tsconfig.node.json": {
+    "mtime": 1784485199.544966,
+    "seen": 1788698126.351727,
+    "ast_hash": "242c5175e8c14acb4ad9de2e6184ffe9",
+    "semantic_hash": "242c5175e8c14acb4ad9de2e6184ffe9"
+  },
+  "frontend/vite.config.ts": {
+    "mtime": 1784485199.564966,
+    "seen": 1788698126.351728,
+    "ast_hash": "c3d255b7f44ec0f103d98e6a576c9b45",
+    "semantic_hash": "c3d255b7f44ec0f103d98e6a576c9b45"
+  },
+  "README.md": {
+    "mtime": 1785522018.2243335,
+    "seen": 1788698126.3517284,
+    "ast_hash": "1287e93c47fc40447b9f705a7a6b87f7",
+    "semantic_hash": "1287e93c47fc40447b9f705a7a6b87f7"
+  },
+  "backend/requirements.txt": {
+    "mtime": 1786553351.52924,
+    "seen": 1788698126.3517294,
+    "ast_hash": "d23fd46a0697edf3eee8dff80db2a18f",
+    "semantic_hash": "d23fd46a0697edf3eee8dff80db2a18f"
+  },
+  "frontend/README.md": {
+    "mtime": 1784485199.456966,
+    "seen": 1788698126.3517299,
+    "ast_hash": "0c865d37715f0abfb1f49a36bf99f9a7",
+    "semantic_hash": "0c865d37715f0abfb1f49a36bf99f9a7"
+  },
+  "frontend/index.html": {
+    "mtime": 1784485199.528966,
+    "seen": 1788698126.3517306,
+    "ast_hash": "f25fc5cb913fd0f8ed0b7d49a6d89f09",
+    "semantic_hash": "f25fc5cb913fd0f8ed0b7d49a6d89f09"
+  },
+  "requirements.txt": {
+    "mtime": 1786553280.4092395,
+    "seen": 1788698126.3517313,
+    "ast_hash": "e14361594fc026b03f24e6b52a253b2e",
+    "semantic_hash": "e14361594fc026b03f24e6b52a253b2e"
+  },
+  "frontend/public/vite.svg": {
+    "mtime": 1784485199.512966,
+    "seen": 1788698126.351732,
+    "ast_hash": "8e3a10e157f75ada21ab742c022d5430",
+    "semantic_hash": "8e3a10e157f75ada21ab742c022d5430"
+  },
+  "frontend/src/assets/favicon.svg": {
+    "mtime": 1784485199.156966,
+    "seen": 1788698126.3517325,
+    "ast_hash": "03b9c45010d3a945620ac72621e3e41e",
+    "semantic_hash": "03b9c45010d3a945620ac72621e3e41e"
+  }
+}
